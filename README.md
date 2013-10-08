@@ -2,7 +2,7 @@
 
 ------------------------------------------
 
-node-ths (node - Tor Hidden Services) is a node.js module allowing you to create and manage Tor hidden services from your app.
+node-ths (node - Tor Hidden Services) is a node.js module allowing you to create and manage [Tor hidden services](https://www.torproject.org/docs/hidden-services) from your app.
 
 ### Overview
 

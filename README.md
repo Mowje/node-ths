@@ -13,7 +13,7 @@ With this module, you can :
 * Create and delete hidden services
 * Adding and removing port bindings to existing hidden services
 
-When you start this module, it runs a dedicated instance of Tor for the hidden services. As of now settings are passed as command line arguments. There is one issue with this, it's that you need to restart the "entire" tor instance to apply settings changes. For further versions, maybe I can use the tor control port/protocol to update settings.
+When you start this module, it runs a dedicated instance of Tor for the hidden services. As of now settings are passed as command line arguments. There is one issue with this, it's that you need to restart the "entire" tor instance to apply settings changes. For further versions, maybe I can use the [tor control port/protocol](https://gitweb.torproject.org/torspec.git/blob_plain/HEAD:/control-spec.txt) to update settings.
 
 ### Requirements
 

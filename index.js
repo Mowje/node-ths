@@ -1,16 +1,87 @@
-module.exports = function(thsFolder, socksPortNumber, showTorMessages){
-	var spawn = require('child_process').spawn;
-	var fs = require('fs');
-	var os = require('os');
-	//var util = require('util');
+var spawn = require('child_process').spawn;
+var fs = require('fs');
+var os = require('os');
+var net = require('net');
+var passhash = require('./passhash');
+//var util = require('util');
+
+module.exports = function(thsFolder, socksPortNumber, controlPortNumber, showTorMessages){
 
 	var fseperator = (os.platform().indexOf('win') == 0) ? '\\' : '/'; //Selects the right path seperator correpsonding to the OS platform
 
-	var torProcess;
+	var torProcess; //Reference to the tor process
+	var controlClient; //Socket to the tor control port
+
+	var controlHash, controlPass;
+	passhash(8, function(pass, hash){
+		controlPass = pass;
+		controlHash = hash;
+	});
 
 	var checkServiceName = function(serviceName){
 		var regexCheck = /^[a-zA-Z0-9-_]+$/;
 		return regexCheck.test(serviceName);
+	};
+
+	var portNumber = (socksPortNumber || 9999).toString();
+	var controlPort = (controlPortNumber || 9998).toString();
+	var showTorLogs = showTorMessages;
+	var services = [];
+
+	/*
+	* Initializing file paths
+	*/
+
+	//Path to folder that will contain the config file and hidden services' keys
+	var baseFolder = thsFolder || process.cwd();
+	if (baseFolder && !(baseFolder.lastIndexOf(fseperator) == baseFolder.length - 1)) baseFolder += fseperator; //Adding the path seperator if necessary
+	baseFolder += 'ths-data' + fseperator;
+	if (!fs.existsSync(baseFolder)) fs.mkdirSync(baseFolder); //Creating the folder if it doesn't exist
+	//Path to config file, inside baseFolder
+	var configFilePath =  baseFolder + 'ths.conf';
+	if (fs.existsSync(configFilePath)) loadConfig();
+	//Path to DataDirectory folder, necessary for the tor process. Note that each instance must have its own DataDirectory folder, seperate from other instances
+	var torDataDir  = baseFolder + 'torData' + fseperator;
+	if (!fs.existsSync(torDataDir)) fs.mkdirSync(torDataDir); //Creating the DataDirectory if it doesn't exist
+	//Path to the torrc file
+	var torrcFilePath = baseFolder + 'torrc';
+
+	/*
+	* Config files and related methods
+	*/
+
+	function saveTorrc(path){
+		var configFile = "";
+		configFile += 'SocksPort ' + portNumber + '\n';
+		configFile += 'ControlPort ' + controlPort + '\n';
+		configFile += 'DataDirectory ' + torDataDir + '\n';
+		configFile += 'HashedControlPassword ' + controlHash + '\n';
+		for (var i = 0; i < services.length; i++){
+			configFile += 'HiddenServiceDir ' + baseFolder + services[i].name + '\n';
+			for (var j = 0; j < services[i].ports.length; j++){
+				configFile += 'HiddenServicePort ' + services[i].ports[j] + '\n';
+			}
+		}
+		fs.writeFileSync(path, configFile);
+	}
+
+	var buildParamArray = function(){
+		var params = [];
+		params.push('--DataDirectory');
+		params.push(torDataDir);
+		params.push('--SocksPort');
+		params.push(portNumber);
+		params.push('--ControlPort');
+		params.push(controlPort);
+		for (var i = 0; i < services.length; i++){
+			params.push('--HiddenServiceDir');
+			params.push(baseFolder + services[i].name);
+			for (var j = 0; j < services[i].ports.length; j++){
+				params.push('--HiddenServicePort');
+				params.push(services[i].ports[j]);
+			}
+		}
+		return params;
 	};
 
 	var loadConfig = function(){
@@ -33,53 +104,33 @@ module.exports = function(thsFolder, socksPortNumber, showTorMessages){
 		return true;
 	};
 
-	var portNumber = (socksPortNumber || 9999).toString();
-	var showTorLogs = showTorMessages;
-	var services = [];
-
-	//Path to folder that will contain the config file and hidden services' keys
-	var baseFolder = thsFolder || process.cwd();
-	if (baseFolder && !(baseFolder.lastIndexOf(fseperator) == baseFolder.length - 1)) baseFolder += fseperator; //Adding the path seperator if necessary
-	baseFolder += 'ths-data' + fseperator;
-	if (!fs.existsSync(baseFolder)) fs.mkdirSync(baseFolder); //Creating the folder if it doesn't exist
-	//Path to config file, inside baseFolder
-	var configFilePath =  baseFolder + 'ths.conf';
-	if (fs.existsSync(configFilePath)) loadConfig();
-	//Path to DataDirectory folder, necessary for the tor process. Note that each instance must have its own DataDirectory folder, seperate from other instances
-	var torDataDir  = baseFolder + 'torData' + fseperator;
-	if (!fs.existsSync(torDataDir)) fs.mkdirSync(torDataDir); //Creating the DataDirectory if it doesn't exist
-
-	var buildParamArray = function(){
-		var params = [];
-		params.push('--DataDirectory');
-		params.push(torDataDir);
-		params.push('--SocksPort');
-		params.push(portNumber);
-		for (var i = 0; i < services.length; i++){
-			params.push('--HiddenServiceDir');
-			params.push(baseFolder + services[i].name);
-			for (var j = 0; j < services[i].ports.length; j++){
-				params.push('--HiddenServicePort');
-				params.push(services[i].ports[j]);
-			}
-		}
-		return params;
-	};
-
 	this.loadConfig = loadConfig;
 
-	this.saveConfig = function(){
+	var saveConfig = function(){
 		if (fs.existsSync(configFilePath)) fs.unlinkSync(configFilePath); //Overwriting didn't seem to work. Hence I delete the file (if it exists) before writing the new config
 		fs.writeFileSync(configFilePath, JSON.stringify(services));
+		saveTorrc(torrcFilePath);
 	};
 
-	this.createHiddenService = function(serviceName, ports, startTor, force, bootstrapCallback){
+	this.saveConfig = saveConfig;
+
+	function signalReload(){
+		if (torProcess && controlClient){
+			controlClient.write('SIGNAL RELOAD\r\n');
+		}
+	}
+
+	/*
+	* Hidden services manageement
+	*/
+
+	this.createHiddenService = function(serviceName, ports, applyNow){
 		if (!(ports && serviceName)) throw new TypeError('Missing parameters');
 		if (!checkServiceName(serviceName)) throw new TypeError('Invalid service name. It should only contain letters, digits, hyphens and underscore (no spaces allowed)');
 		//Checking that the service name isn't already taken
 		for (var i = 0; i < services.length; i++){
 			if (services[i].name == serviceName){
-				throw new TypeError('A service called ' + serviceName + ' already exists');
+				throw new TypeError('A service called "' + serviceName + '" already exists');
 				return;
 			}
 		}
@@ -91,12 +142,13 @@ module.exports = function(thsFolder, socksPortNumber, showTorMessages){
 			service.ports = [ports];
 		}
 		services.push(service);
-		if (startTor){
-			this.start(force, bootstrapCallback);
+		if (applyNow){
+			saveConfig();
+			signalReload();
 		}
 	};
 
-	this.removeHiddenService = function(serviceName, startTor, force, bootstrapCallback){
+	this.removeHiddenService = function(serviceName, applyNow){
 		if (!checkServiceName(serviceName)) throw new TypeError('Invalid service name. It should only contain letters, digits, hyphens and underscore (no spaces allowed)');
 		for (var i = 0; i < services.length; i++){
 			if (services[i].name == serviceName) {
@@ -111,9 +163,13 @@ module.exports = function(thsFolder, socksPortNumber, showTorMessages){
 				}
 			}
 		}
+		if (applyNow){
+			saveConfig();
+			signalReload();
+		}
 	};
 
-	this.addPorts = function(serviceName, ports, startTor, force, bootstrapCallback){
+	this.addPorts = function(serviceName, ports, applyNow){
 		if (!serviceName) throw new TypeError('Service name can\'t be null');
 		if (!checkServiceName(serviceName)) throw new TypeError('Invalid service name. It should only contain letters, digits, hyphens and underscore (no spaces allowed)');
 		for (var i = 0; i < services.length; i++){
@@ -123,14 +179,17 @@ module.exports = function(thsFolder, socksPortNumber, showTorMessages){
 						services[i].ports.push(ports[j]);
 					}
 				} else services[i].ports.push(ports);
-				if (startTor) this.start(force, bootstrapCallback);
+				if (applyNow){
+					saveConfig();
+					signalReload();
+				}
 				return;
 			}
 		}
 		throw new TypeError('Service ' + serviceName + ' not found');
 	};
 
-	this.removePorts = function(serviceName, ports, deleteIfEmptied, startTor, force, bootstrapCallback){
+	this.removePorts = function(serviceName, ports, deleteIfEmptied, applyNow){
 		if (!serviceName) throw new TypeError('Service name can\'t be null');
 		if (!checkServiceName(serviceName)) throw new TypeError('Invalid service name. It should only contain letters, digits, hyphens and underscore (no spaces allowed)');
 		for (var i = 0; i < services.length; i++){
@@ -157,8 +216,9 @@ module.exports = function(thsFolder, socksPortNumber, showTorMessages){
 				if (deleteIfEmptied && services[i].ports.length == 0){
 					this.removeHiddenService(serviceName);
 				}
-				if (startTor){
-					this.start(force, bootstrapCallback);
+				if (applyNow){
+					saveConfig();
+					signalReload();
 				}
 				return;
 			}
@@ -220,7 +280,13 @@ module.exports = function(thsFolder, socksPortNumber, showTorMessages){
 					});
 				}
 			}
-			console.log("Tor process PID : " + torProcess.pid);
+			controlClient = net.connect({host: '127.0.0.1', port: Number(controlPort)}, function(){
+				controlClient.write('AUTHENTICATE "' + controlPass + '"\r\n');
+				console.log("Tor process PID : " + torProcess.pid);
+			});
+			controlClient.on('data', function(data){
+				console.log('Message from ControlPort: ' + data.toString());
+			});
 		}
 	};
 
@@ -234,6 +300,8 @@ module.exports = function(thsFolder, socksPortNumber, showTorMessages){
 				callback();
 			});
 		}
+		controlClient.close();
+		controlClient = undefined;
 		torProcess.kill();
 		torProcess = undefined;
 	};
@@ -246,6 +314,8 @@ module.exports = function(thsFolder, socksPortNumber, showTorMessages){
 	process.on('exit', function(){
 		if (torProcess){
 			console.log('Killing the Tor child process');
+			controlClient.close();
+			controlClient = undefined;
 			torProcess.kill();
 			torProcess = undefined;
 		}

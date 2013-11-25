@@ -3,20 +3,15 @@ var fs = require('fs');
 var os = require('os');
 var net = require('net');
 var passhash = require('./passhash');
-//var util = require('util');
 
-module.exports = function(thsFolder, socksPortNumber, controlPortNumber, showTorMessages){
+module.exports = function(thsFolder, socksPortNumber, controlPortNumber, showTorMessages, showTorControlMessages){
 
-	var fseperator = (os.platform().indexOf('win') == 0) ? '\\' : '/'; //Selects the right path seperator correpsonding to the OS platform
+	var fseperator = (os.platform().indexOf('win') == 0) ? '\\' : '/'; //Selects the right path seperator corresponding to the OS platform
 
 	var torProcess; //Reference to the tor process
 	var controlClient; //Socket to the tor control port
 
 	var controlHash, controlPass;
-	passhash(8, function(pass, hash){
-		controlPass = pass;
-		controlHash = hash;
-	});
 
 	var checkServiceName = function(serviceName){
 		var regexCheck = /^[a-zA-Z0-9-_]+$/;
@@ -43,8 +38,9 @@ module.exports = function(thsFolder, socksPortNumber, controlPortNumber, showTor
 	//Path to DataDirectory folder, necessary for the tor process. Note that each instance must have its own DataDirectory folder, seperate from other instances
 	var torDataDir  = baseFolder + 'torData' + fseperator;
 	if (!fs.existsSync(torDataDir)) fs.mkdirSync(torDataDir); //Creating the DataDirectory if it doesn't exist
-	//Path to the torrc file
+	//Path to the torrc file. Create a basic file it doesn't exist
 	var torrcFilePath = baseFolder + 'torrc';
+	if (!fs.existsSync(torrcFilePath)) saveTorrc(torrcFilePath);
 
 	/*
 	* Config files and related methods
@@ -84,7 +80,7 @@ module.exports = function(thsFolder, socksPortNumber, controlPortNumber, showTor
 		return params;
 	};
 
-	var loadConfig = function(){
+	function loadConfig(){
 		var configLoadObj;
 		var configText
 		try {
@@ -106,7 +102,7 @@ module.exports = function(thsFolder, socksPortNumber, controlPortNumber, showTor
 
 	this.loadConfig = loadConfig;
 
-	var saveConfig = function(){
+	function saveConfig(){
 		if (fs.existsSync(configFilePath)) fs.unlinkSync(configFilePath); //Overwriting didn't seem to work. Hence I delete the file (if it exists) before writing the new config
 		fs.writeFileSync(configFilePath, JSON.stringify(services));
 		saveTorrc(torrcFilePath);
@@ -158,9 +154,6 @@ module.exports = function(thsFolder, socksPortNumber, controlPortNumber, showTor
 					fs.unlinkSync(baseFolder + serviceName + fseperator + containedFiles[j]);
 				}
 				fs.rmdirSync(baseFolder + serviceName);
-				if (startTor){
-					this.start(force, bootstrapCallback);
-				}
 			}
 		}
 		if (applyNow){
@@ -252,7 +245,7 @@ module.exports = function(thsFolder, socksPortNumber, controlPortNumber, showTor
 	};
 
 	this.start = function(force, bootstrapCallback){
-		if (!services || services.length == 0) throw new TypeError('Please load the config before calling the start() method');
+		//if (!services || services.length == 0) throw new TypeError('Please load the config before calling the start() method');
 		if (torProcess) {
 			if (force) {
 				//Kills the process and waits it to shutdown, then recalls start a second time, with force == false and passes the callback given at the first call
@@ -263,36 +256,37 @@ module.exports = function(thsFolder, socksPortNumber, controlPortNumber, showTor
 				throw new TypeError('A Tor instance is already running. Please stop before starting a new one.');
 			}
 		} else {
-			var torParams = buildParamArray();
-			torProcess = spawn('tor', torParams);
-			torProcess.stderr.on('data', function(data){
-				console.log('Error from child tor process:\n' + data.toString('utf8'));
-			});
-			if (bootstrapCallback && typeof bootstrapCallback == 'function'){
-				torProcess.stdout.on('data', function(data){
-					if (showTorLogs) console.log(data.toString('utf8'));
-					if (data.toString('utf8').indexOf('Bootstrapped 100%: Done') > -1) bootstrapCallback();
+			passhash(8, function(pass, hash){
+				controlPass = pass;
+				controlHash = hash;
+				saveTorrc(torrcFilePath);
+				torProcess = spawn('tor', ['-f', torrcFilePath]);
+				torProcess.stderr.on('data', function(data){
+					console.log('Error from child tor process:\n' + data.toString('utf8'));
 				});
-			} else {
-				if (showTorLogs){
-					torProcess.stdout.on('data', function(){
-						console.log(data.toString('utf8'));
-					});
-				}
-			}
-			controlClient = net.connect({host: '127.0.0.1', port: Number(controlPort)}, function(){
-				controlClient.write('AUTHENTICATE "' + controlPass + '"\r\n');
-				console.log("Tor process PID : " + torProcess.pid);
-			});
-			controlClient.on('data', function(data){
-				console.log('Message from ControlPort: ' + data.toString());
+
+				torProcess.stdout.on('data', function(data){
+					if (data.toString().indexOf('[warn]') > -1 || data.toString().indexOf('[err]') > -1) console.log('Error with the tor process : ' + data.toString('utf8'));
+					if (showTorLogs) console.log(data.toString('utf8'));
+					if (data.toString('utf8').indexOf('Bootstrapped 100%') > -1) {
+						controlClient = net.connect({host: '127.0.0.1', port: Number(controlPort)}, function(){
+							controlClient.write('AUTHENTICATE "' + controlPass + '"\r\n');
+							console.log("Tor process PID : " + torProcess.pid);
+						});
+						controlClient.on('data', function(data){
+							data = data.toString();
+							if (showTorControlMessages) console.log('Message from ControlPort: ' + data);
+							//console.log('Message from ControlPort: ' + data.toString());
+						});
+						if (typeof bootstrapCallback == 'function') bootstrapCallback();
+					}
+				});
 			});
 		}
 	};
 
 	this.stop = function(callback){
 		if (!torProcess) {
-			//throw new TypeError('Error on stop() : No tor process is running');
 			return;
 		}
 		if (callback && typeof callback == 'function') {
@@ -300,8 +294,11 @@ module.exports = function(thsFolder, socksPortNumber, controlPortNumber, showTor
 				callback();
 			});
 		}
-		controlClient.close();
-		controlClient = undefined;
+		if (controlClient){
+			controlClient.end();
+			controlClient.destroy();
+			controlClient = undefined;
+		}
 		torProcess.kill();
 		torProcess = undefined;
 	};
@@ -312,10 +309,13 @@ module.exports = function(thsFolder, socksPortNumber, controlPortNumber, showTor
 
 	//Sets node exit event handler, to kill the tor process if running
 	process.on('exit', function(){
+		if (controlClient){
+			controlClient.end();
+			controlClient.destroy();
+			controlClient = undefined;
+		}
 		if (torProcess){
 			console.log('Killing the Tor child process');
-			controlClient.close();
-			controlClient = undefined;
 			torProcess.kill();
 			torProcess = undefined;
 		}

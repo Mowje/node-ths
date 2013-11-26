@@ -41,11 +41,20 @@ rl.on('line', function(line){
 		case 'list':
 			var serviceList = ths.getServices();
 			for (var i = 0; i < serviceList.length; i++){
-				console.log('Service ' + (i + 1).toString() + ':' + serviceList[i].name);
+				console.log('Service ' + (i + 1).toString() + ': ' + serviceList[i].name + ' - ' + serviceList[i].hostname);
 				for (var j = 0; j < serviceList[i].ports.length; j++){
 					console.log(serviceList[i].ports[j]);
 				}
 				console.log('');
+			}
+			break;
+		case 'onion':
+			//syntax : onion service-name
+			if (line.length > 1){
+				var serviceName = line[1];
+				console.log('Onion name for ' + serviceName + ' : ' + ths.getOnionAddress(serviceName));
+			} else {
+				console.log('Invalid command. Syntax : onion service-name');
 			}
 			break;
 		case 'add':
@@ -70,6 +79,16 @@ rl.on('line', function(line){
 				ths.removeHiddenService(serviceName, true);
 			} else {
 				console.log('Invalid command. Syntax : delete service-name');
+			}
+			break;
+		case 'rename':
+			//syntax : rename service-name new-name
+			if (line.length == 3){
+				var serviceName = line[1];
+				var newName = line[2];
+				ths.rename(serviceName, newName);
+			} else {
+				console.log('Invalid command. Syntax : rename service-name new-name');
 			}
 			break;
 		case 'addport':

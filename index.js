@@ -41,6 +41,9 @@ module.exports = function(thsFolder, socksPortNumber, controlPortNumber, showTor
 	//Path to the torrc file. Create a basic file it doesn't exist
 	var torrcFilePath = baseFolder + 'torrc';
 	if (!fs.existsSync(torrcFilePath)) saveTorrc(torrcFilePath);
+	//Path to the folder that will contain the private keys and hostnames for each hidden service
+	var hiddenServicePath  = baseFolder + 'keys' + fseperator;
+	if (!fs.existsSync(hiddenServicePath)) fs.mkdirSync(hiddenServicePath);
 
 	/*
 	* Config files and related methods
@@ -53,7 +56,7 @@ module.exports = function(thsFolder, socksPortNumber, controlPortNumber, showTor
 		configFile += 'DataDirectory ' + torDataDir + '\n';
 		configFile += 'HashedControlPassword ' + controlHash + '\n';
 		for (var i = 0; i < services.length; i++){
-			configFile += 'HiddenServiceDir ' + baseFolder + services[i].name + '\n';
+			configFile += 'HiddenServiceDir ' + hiddenServicePath + services[i].name + '\n';
 			for (var j = 0; j < services[i].ports.length; j++){
 				configFile += 'HiddenServicePort ' + services[i].ports[j] + '\n';
 			}
@@ -71,7 +74,7 @@ module.exports = function(thsFolder, socksPortNumber, controlPortNumber, showTor
 		params.push(controlPort);
 		for (var i = 0; i < services.length; i++){
 			params.push('--HiddenServiceDir');
-			params.push(baseFolder + services[i].name);
+			params.push(hiddenServicePath + services[i].name);
 			for (var j = 0; j < services[i].ports.length; j++){
 				params.push('--HiddenServicePort');
 				params.push(services[i].ports[j]);
@@ -149,17 +152,32 @@ module.exports = function(thsFolder, socksPortNumber, controlPortNumber, showTor
 		for (var i = 0; i < services.length; i++){
 			if (services[i].name == serviceName) {
 				services.splice(i, 1);
-				var containedFiles = fs.readdirSync(baseFolder + serviceName);
+				var containedFiles = fs.readdirSync(hiddenServicePath + serviceName);
 				for (var j = 0; j < containedFiles.length; j++){
-					fs.unlinkSync(baseFolder + serviceName + fseperator + containedFiles[j]);
+					fs.unlinkSync(hiddenServicePath + serviceName + fseperator + containedFiles[j]);
 				}
-				fs.rmdirSync(baseFolder + serviceName);
+				fs.rmdirSync(hiddenServicePath + serviceName);
 			}
 		}
 		if (applyNow){
 			saveConfig();
 			signalReload();
 		}
+	};
+
+	this.rename = function(serviceName, newName){
+		if (!(typeof serviceName == 'string' && typeof newName == 'string')) throw new TypeError('serviceName and newName must be strings');
+		var found = false;
+		for (var i = 0; i < services.length; i++){
+			if (services[i].name == serviceName){
+				services[i].name = newName;
+				fs.renameSync(hiddenServicePath + serviceName, hiddenServicePath + newName);
+				saveConfig();
+				found = true;
+				break;
+			}
+		}
+		return found;
 	};
 
 	this.addPorts = function(serviceName, ports, applyNow){
@@ -207,7 +225,7 @@ module.exports = function(thsFolder, socksPortNumber, controlPortNumber, showTor
 					}
 				}
 				if (deleteIfEmptied && services[i].ports.length == 0){
-					this.removeHiddenService(serviceName);
+					this.removeHiddenService(serviceName, applyNow);
 				}
 				if (applyNow){
 					saveConfig();
@@ -225,7 +243,7 @@ module.exports = function(thsFolder, socksPortNumber, controlPortNumber, showTor
 				var fileReadCount = 0;
 				while (fileReadCount < 3){
 					try {
-						return fs.readFileSync(baseFolder + serviceName + '/hostname').toString('utf8').replace('\n', '');
+						return fs.readFileSync(hiddenServicePath + serviceName + fseperator + 'hostname').toString('utf8').replace('\n', '');
 					} catch (e){
 						if (fileReadCount < 3) fileReadCount++;
 						else throw e;

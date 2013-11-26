@@ -4,7 +4,7 @@
 
 node-ths (node - Tor Hidden Services) is a node.js module allowing you to create and manage [Tor hidden services](https://www.torproject.org/docs/hidden-services) from your app.
 
-### Overview
+## Overview
 
 Part of a bigger project, I needed to be able to to create and manage programmatically Tor Hidden Services from a Node.js application.
 
@@ -13,14 +13,14 @@ With this module, you can :
 * Create and delete hidden services
 * Adding and removing port bindings to existing hidden services
 
-When you start this module, it runs a dedicated instance of Tor for the hidden services. It writes the 
+When you start this module, it runs a dedicated instance of Tor for the hidden services. It writes a dedicated torrc file. Whenever you change a setting, the torrc file is update and the config is reload through a signal sent on the tor control port.
 
-### Requirements
+## Requirements
 
 * [Node.js](http://nodejs.org)
 * [Tor](https://torproject.org), installed so that it could be called from terminal/command line by running a simple "tor" command
 
-### Installation
+## Installation
 
 Simply run
 
@@ -28,17 +28,19 @@ Simply run
 	
 from your app's folder to install the module
 
-### Usage
+## Usage
 
-_Preliminary note_ : whenever you modify a setting, the new config isn't written. You have to explicitly call the ```saveConfig()``` method. Also, the new changes aren't applied unless you (re)start the tor instance.
+_Preliminary note_ : whenever you modify a setting, the new config isn't written. You have to explicitly call the ```saveConfig()``` method or set `applyNow = true` in methods that allow this parameter. Changes are applied without restarting the tor instance.
 
-__ths([thsFolder], [socksPortNumber], [showTorMessages])__ :
+__ths([thsFolder], [socksPortNumber], [controlPortNumber], [showTorMessages], [showTorControlMessages])__ :
 
 Constructor of a node-ths module instance. Note that this constructor calls the ```loadConfig()``` method.
 	
 * thsFolder : the folder that will contain the ths-data folder. ths.conf file and the hidden services' keys and hostname files. Also, this is where the tor "DataDirectory" is found(necessary and unique for each tor instance). This parameter defaults to "/path/to/your/app/ths-data"
 * socksPortNumber : the SOCKS server port that the underlying tor instance will use. Defaults to port 9999
-* showTorMessages : a boolean, determining whether usual tor console messages should be shown of not. Defaults to false
+* controlPortNumber : the Tor control port number. Used to force the process to reload the config without restarting. Defaults to 9998.
+* showTorMessages : a boolean, determining whether usual tor console messages should be shown of not. Defaults to false.
+* showTorControlMessages : a boolean, determining whethet the tor control port replies should be shown in the console or not. Defaults to false.
 
 *Example :*
 	
@@ -62,7 +64,7 @@ __ths.isTorRunning()__ :
 
 Returns a boolean, true if the underlying tor instance is running; false if it isn't
 
-__ths.createHiddenService(serviceName, ports, [startTor], [force], [bootstrapCallback])__ :
+__ths.createHiddenService(serviceName, ports, [applyNow])__ :
 
 Creates a new tor hidden service :
 
@@ -72,39 +74,35 @@ HiddenServicePort VIRTPORT [TARGET]
 Configure a virtual port VIRTPORT for a hidden service. You may use this option multiple times; each time applies to the service using the most recent hiddenservicedir. By default, this option maps the virtual port to the same port on 127.0.0.1 over TCP. You may override the target port, address, or both by specifying a target of addr, port, or addr:port. You may also have multiple lines with the same VIRTPORT: when a user connects to that VIRTPORT, one of the TARGETs from those lines will be chosen at random.
 ```
 * serviceName : a "human-readable" name for the service. This service's identifier for the node-ths module. It will be asked by some other methods. This name is restricted to alphanumerical chars, hyphens and underscores (no spaces)
-* startNow : a boolean determining whether the underlying tor instance should be started at the end of this method. Defaults to false
-* force : a boolean determining whether the tor instance start should be forced or not (restarting tor if it is already running). Defaults to false
-* callback : a callback function called when the tor instance is started and bootstrapped
+* applyNow : writes the new config on the disk and (if tor is running) sends a 'reload config' signal to the process. Defaults to false.
 
-__ths.removeHiddenService(serviceName, [startTor], [force], [bootstrapCallback])__ :
+__ths.removeHiddenService(serviceName, [applyNow])__ :
 
 Removes the hidden service with the given serviceName
 
 * serviceName : name of the hidden service to be removed
-* startTor : a boolean, determining whether the tor instance should be started or not. Defaults to false.
-* force : a boolean, determining whether the tor start should be forced if startTor == true (ie restarting an instance if one is running). Defaults to false.
-* bootstrapCallback : a callback function, with no parameters, executed when the tor instance is started and bootstraped
+* applyNow : writes the new config on the disk and (if tor is running) sends a 'reload config' signal to the process. Defaults to false.
 
-__ths.addPorts(serviceName, ports, [startTor], [force], [bootstrapCallback])__ :
+__ths.rename(serviceName, newName)__ :
+
+Renames the hidden service. Saves the new config on disk.
+
+__ths.addPorts(serviceName, ports, [applyNow])__ :
 
 Add ports bindings to an existing hidden service
 
 * serviceName : the name of the service to which we'll add the ports
 * ports : ports entry or array of port entries to be added
-* startTor : a boolean, determining whether the tor instance should be started at the end of this method. Defaults to false
-* force : a boolean, determining whether the tor start should be forced if startTor == true (ie restarting an instance if one is running). Defaults to false.
-* bootstrapCallback : a callback function, with no parameters, executed when the tor instance is started and bootstrapped
+* applyNow : writes the new config on the disk and (if tor is running) sends a 'reload config' signal to the process. Defaults to false.
 
-__ths.removePorts(serviceName, ports, [deleteIfEmptied], [startTor], [force], [bootstrapCallback])__ :
+__ths.removePorts(serviceName, ports, [deleteIfEmptied], [applyNow])__ :
 
 Removes the given ports from the given service
 
 * serviceName : the name of the service from which we'll remove the ports
 * ports : ports entry or array of port entries to be removed
 * deleteIfEmptied : a boolean, determining whether the hidden service should be deleted if there are no more ports entry in it. Defaults to false.
-* startTor : a boolean, determining whether the tor instance should be started at the end of this method. Defaults to false
-* force : a boolean, determining whether the tor start should be forced if startTor == true (ie restarting an instance if one is running). Defaults to false
-* bootstrapCallback : a callback function, with no parameters, executed when the tor instance is started and bootsrapped
+* applyNow : writes the new config on the disk and (if tor is running) sends a 'reload config' signal to the process. Defaults to false.
 
 __ths.getServices()__ :
 

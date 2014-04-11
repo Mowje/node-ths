@@ -241,7 +241,7 @@ module.exports = function(thsFolder, socksPortNumber, controlPortNumber, showTor
 		for (var i = 0; i < services.length; i++){
 			if (services[i].name == serviceName) {
 				var fileReadCount = 0;
-				while (fileReadCount < 3){
+				while (fileReadCount < 3){ //Why did I write this? Answer : Trying 3 times in vain in case the files are not here yet...
 					try {
 						return fs.readFileSync(hiddenServicePath + serviceName + fseperator + 'hostname').toString('utf8').replace('\n', '');
 					} catch (e){

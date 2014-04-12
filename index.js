@@ -251,11 +251,22 @@ module.exports = function(thsFolder, socksPortNumber, controlPortNumber, showTor
 				}
 			}
 		}
-		throw new TypeError('Service name ' + serviceName + ' not found in config');
+		if (torProcess) throw new TypeError('Service name ' + serviceName + ' not found in config');
+		else return undefined;
 	};
 
 	this.getServices = function(){
-		var servicesCopy = services;
+		var servicesCopy = [];
+		//Do a deep copy of the services array
+		for (var i = 0; i < services.length; i++){
+			var serviceObjCopy = {};
+			serviceObjCopy.name = String(services[i].name);
+			serviceObjCopy.ports = [];
+			for (var j = 0; j < services[i].ports.length; j++){
+				serviceObjCopy.ports.push(String(services[i].ports[j]));
+			}
+			servicesCopy.push(serviceObjCopy);
+		}
 		for (var i = 0; i < servicesCopy.length; i++){
 			servicesCopy[i].hostname = this.getOnionAddress(servicesCopy[i].name);
 		}

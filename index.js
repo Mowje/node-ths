@@ -217,7 +217,7 @@ module.exports = function(thsFolder, socksPortNumber, controlPortNumber, showTor
 					}
 				} else {
 					// If the given ports is not an array (hence, normally, only one ports entry)
-					for (var k = 0; k < services[i].ports; k++){
+					for (var k = 0; k < services[i].ports.length; k++){
 						if (services[i].ports[k] == ports){
 							services[i].ports.splice(k, 1);
 							break;

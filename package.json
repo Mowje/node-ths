@@ -1,6 +1,6 @@
 {
   "name": "ths",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "A module that lets you create Tor hidden services from node.js",
   "main": "index.js",
   "scripts": {

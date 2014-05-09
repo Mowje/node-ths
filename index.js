@@ -2,12 +2,13 @@ var spawn = require('child_process').spawn;
 var fs = require('fs');
 var os = require('os');
 var net = require('net');
+var path = require('path');
 var passhash = require('./passhash');
 
-module.exports = function(thsFolder, socksPortNumber, controlPortNumber, showTorMessages, showTorControlMessages){
+module.exports = function(thsFolder, socksPortNumber, controlPortNumber, torMessageHandler, torErrorHandler, torControlMessageHandler){
 
-	var fseperator = (os.platform().indexOf('win') == 0) ? '\\' : '/'; //Selects the right path seperator corresponding to the OS platform
-
+	//var fseperator = (os.platform().indexOf('win') == 0) ? '\\' : '/'; //Selects the right path seperator corresponding to the OS platform
+	var fseperator = path.sep;
 	var torProcess; //Reference to the tor process
 	var controlClient; //Socket to the tor control port
 
@@ -18,9 +19,15 @@ module.exports = function(thsFolder, socksPortNumber, controlPortNumber, showTor
 		return regexCheck.test(serviceName);
 	};
 
+	if (socksPortNumber && typeof socksPortNumber != 'number') throw new TypeError('When defined, socksPortNumber must be a number');
+	if (controlPortNumber && typeof controlPortNumber != 'number') throw new TypeError('When defined, controlPortNumber must be a number');
+
+	if (torMessageHandler && typeof torMessageHandler != 'function') throw new TypeError('When defined, torMessageHandler must be a function');
+	if (torErrorHandler && typeof torErrorHandler != 'function') throw new TypeError('When defined, torErrorHandler must be a function');
+	if (torControlMessageHandler && typeof torControlMessageHandler != 'function') throw new TypeError('When defined, torControlMessageHandler must be a function');
+
 	var portNumber = (socksPortNumber || 9999).toString();
 	var controlPort = (controlPortNumber || 9998).toString();
-	var showTorLogs = showTorMessages;
 	var services = [];
 
 	/*
@@ -90,6 +97,7 @@ module.exports = function(thsFolder, socksPortNumber, controlPortNumber, showTor
 			configText = fs.readFileSync(configFilePath);
 			configLoadObj = JSON.parse(configText);
 		} catch (e) {
+			throw e;
 			//console.log('Error on THS config load\n' + e);
 			return false;
 		}
@@ -280,7 +288,7 @@ module.exports = function(thsFolder, socksPortNumber, controlPortNumber, showTor
 				//Kills the process and waits it to shutdown, then recalls start a second time, with force == false and passes the callback given at the first call
 				this.stop(function(){
 					this.start(false, bootstrapCallback);
-				});	
+				});
 			} else {
 				throw new TypeError('A Tor instance is already running. Please stop before starting a new one.');
 			}
@@ -290,21 +298,26 @@ module.exports = function(thsFolder, socksPortNumber, controlPortNumber, showTor
 				controlHash = hash;
 				saveTorrc(torrcFilePath);
 				torProcess = spawn('tor', ['-f', torrcFilePath]);
+				torProcess.stderr.setEncoding('utf8');
 				torProcess.stderr.on('data', function(data){
-					console.log('Error from child tor process:\n' + data.toString('utf8'));
+					//console.log('Error from child tor process:\n' + data.toString('utf8'));
+					if (torErrorHandler) torErrorHandler(data);
 				});
 
 				torProcess.stdout.on('data', function(data){
-					if (data.toString().indexOf('[warn]') > -1 || data.toString().indexOf('[err]') > -1) console.log('Error with the tor process : ' + data.toString('utf8'));
-					if (showTorLogs) console.log(data.toString('utf8'));
+					if (data.toString().indexOf('[warn]') > -1 || data.toString().indexOf('[err]') > -1){
+						if (torErrorHandler) torErrorHandler(data.toString('utf8'));
+						//console.log('Error with the tor process : ' + data.toString('utf8'));
+					}
 					if (data.toString('utf8').indexOf('Bootstrapped 100%') > -1) {
 						controlClient = net.connect({host: '127.0.0.1', port: Number(controlPort)}, function(){
 							controlClient.write('AUTHENTICATE "' + controlPass + '"\r\n');
-							console.log("Tor process PID : " + torProcess.pid);
+							//console.log("Tor process PID : " + torProcess.pid);
 						});
 						controlClient.on('data', function(data){
 							data = data.toString();
-							if (showTorControlMessages) console.log('Message from ControlPort: ' + data);
+							if (torControlMessageHandler) torControlMessageHandler(data.toString());
+							//if (showTorControlMessages) console.log('Message from ControlPort: ' + data);
 							//console.log('Message from ControlPort: ' + data.toString());
 						});
 						if (typeof bootstrapCallback == 'function') bootstrapCallback();
@@ -344,11 +357,20 @@ module.exports = function(thsFolder, socksPortNumber, controlPortNumber, showTor
 			controlClient = undefined;
 		}
 		if (torProcess){
-			console.log('Killing the Tor child process');
+			//console.log('Killing the Tor child process');
 			torProcess.kill();
 			torProcess = undefined;
 		}
 	});
+
+	this.torPid = function(){
+		if (torProcess) return torProcess.pid;
+		else return null;
+	};
+
+	this.socksPort = function(){
+		return portNumber;
+	};
 
 	//Return the newly constructed ths instance
 	return this;

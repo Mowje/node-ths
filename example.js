@@ -121,11 +121,34 @@ rl.on('line', function(line){
 				console.log('Invalid command. Syntax : removeport service-name port1 [port2,...]');
 			}
 			break;
+		case 'pid':
+			if (ths.isTorRunning()){
+				console.log('Tor PID : ' + ths.torPid());
+			} else {
+				console.log('The Tor process isn\'t running');
+			}
+			break;
+		case 'help':
+			console.log('Usage:\n' +
+				'start [force]  -- Start the tor process\n' +
+				'stop  -- Stop the tor process\n' +
+				'list  -- List the configured hidden services\n' +
+				'status -- Get whether the tor process is running or not\n' +
+				'onion serviceName  -- Get the onion address if the service named "serviceName", if defined\n' +
+				'add serviceName traget1 port1 [target2 port2 ...]  -- Create a hidden service, referenced as "serviceName", with the given targets and ports\n' +
+				'delete serviceName  -- Delete the service named "serviceName"\n' +
+				'rename oldServiceName newServiceName  -- Rename in the config the "oldServiceName" service into "newServiceName"\n' +
+				'addport serviceName port1 target1 [port2 target2 ...]  -- Add ports to service "serviceName"\n' +
+				'removeport serviceName  -- Remove ports from "serviceName"\n' +
+				'pid  -- Get the tor process PID\n' +
+				'exit  -- Exit this program');
+			break;
 		case 'exit':
 			process.exit(0);
 			break;
 		default:
 			console.log('Unknown command: ' + line[0]);
+			console.log('If you\'re lost, use the "help" command');
 			break;
 	}
 	rl.prompt();

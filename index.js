@@ -5,7 +5,7 @@ var net = require('net');
 var path = require('path');
 var passhash = require('./passhash');
 
-module.exports = function(thsFolder, socksPortNumber, controlPortNumber, torMessageHandler, torErrorHandler, torControlMessageHandler){
+module.exports = function(thsFolder, socksPortNumber, controlPortNumber, torErrorHandler, torMessageHandler, torControlMessageHandler){
 
 	//var fseperator = (os.platform().indexOf('win') == 0) ? '\\' : '/'; //Selects the right path seperator corresponding to the OS platform
 	var fseperator = path.sep;
@@ -308,6 +308,8 @@ module.exports = function(thsFolder, socksPortNumber, controlPortNumber, torMess
 					if (data.toString().indexOf('[warn]') > -1 || data.toString().indexOf('[err]') > -1){
 						if (torErrorHandler) torErrorHandler(data.toString('utf8'));
 						//console.log('Error with the tor process : ' + data.toString('utf8'));
+					} else {
+						if (torMessageHandler) torMessageHandler(data.toString('utf8'));
 					}
 					if (data.toString('utf8').indexOf('Bootstrapped 100%') > -1) {
 						controlClient = net.connect({host: '127.0.0.1', port: Number(controlPort)}, function(){

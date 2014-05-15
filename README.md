@@ -18,32 +18,33 @@ When you start this module, it runs a dedicated instance of Tor for the hidden s
 ## Requirements
 
 * [Node.js](http://nodejs.org)
-* [Tor](https://torproject.org), installed so that it could be called from terminal/command line by running a simple "tor" command
+* [Tor](https://torproject.org), installed so that it could be called from terminal/command line by running a simple ```tor``` command
 
 ## Installation
 
 Simply run
 
 	npm install ths
-	
+
 from your app's folder to install the module
 
 ## Usage
 
 _Preliminary note_ : whenever you modify a setting, the new config isn't written. You have to explicitly call the ```saveConfig()``` method or set `applyNow = true` in methods that allow this parameter. Changes are applied without restarting the tor instance.
 
-__ths([thsFolder], [socksPortNumber], [controlPortNumber], [showTorMessages], [showTorControlMessages])__ :
+__ths([thsFolder], [socksPortNumber], [controlPortNumber], [torErrorHandler], [torMessageHandler], [torControlMessageHandler])__ :
 
 Constructor of a node-ths module instance. Note that this constructor calls the ```loadConfig()``` method.
-	
+
 * thsFolder : the folder that will contain the ths-data folder. ths.conf file and the hidden services' keys and hostname files. Also, this is where the tor "DataDirectory" is found(necessary and unique for each tor instance). This parameter defaults to "/path/to/your/app/ths-data"
 * socksPortNumber : the SOCKS server port that the underlying tor instance will use. Defaults to port 9999
 * controlPortNumber : the Tor control port number. Used to force the process to reload the config without restarting. Defaults to 9998.
-* showTorMessages : a boolean, determining whether usual tor console messages should be shown of not. Defaults to false.
-* showTorControlMessages : a boolean, determining whethet the tor control port replies should be shown in the console or not. Defaults to false.
+* torErrorHandler: a function that will receive Tor's warnings and error messages (one paramater, as a string). Optional. Not used by default.
+* torMessageHandler : a function that will receive standard Tor info messages (one parameter, as a string). Optional. Not used by default.
+* torControlMessageHandler : a function that will receive the control messages coming from the control port of the Tor process (one parameter, as a string). Optional. Not used by default.
 
 *Example :*
-	
+
 	var thsBuilder = require('ths');
 	var ths = thsBuilder(__dirname);
 
@@ -69,7 +70,7 @@ __ths.createHiddenService(serviceName, ports, [applyNow])__ :
 Creates a new tor hidden service :
 
 * [port] : Port string or array of port strings. These strings must have the same format/syntax as for a "HiddenServicePort" in a usual torrc config file. This is how it works (harvested from the tor man page) :
-```	
+```
 HiddenServicePort VIRTPORT [TARGET]
 Configure a virtual port VIRTPORT for a hidden service. You may use this option multiple times; each time applies to the service using the most recent hiddenservicedir. By default, this option maps the virtual port to the same port on 127.0.0.1 over TCP. You may override the target port, address, or both by specifying a target of addr, port, or addr:port. You may also have multiple lines with the same VIRTPORT: when a user connects to that VIRTPORT, one of the TARGETs from those lines will be chosen at random.
 ```
@@ -113,6 +114,14 @@ __ths.getOnionAddress(serviceName)__ :
 Returns the .onion hostname for the given service
 
 * serviceName : name of the service you are looking for
+
+__ths.torPid()__ :
+
+Returns the PID of the current Tor process, if it exists.
+
+__ths.socksPort()__ :
+
+Returns the SOCKS port number Tor process is running on.
 
 __ths.loadConfig()__ :
 

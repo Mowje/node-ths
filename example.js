@@ -5,7 +5,7 @@
 var readline = require('readline');
 var http = require('http');
 var thsBuilder = require('./index');
-var ths = thsBuilder();
+var ths = thsBuilder(undefined, undefined, undefined, console.error, console.log, function(controlMessage){console.log('Ctrl: ' + controlMessage)});
 
 var server = http.createServer(function (req, res){
 	res.writeHead(200, {'Content-Type': 'text/plain'});

@@ -97,7 +97,7 @@ module.exports = function(thsFolder, socksPortNumber, controlPortNumber, torErro
 			configText = fs.readFileSync(configFilePath);
 			configLoadObj = JSON.parse(configText);
 		} catch (e) {
-			throw e;
+			//throw e;
 			//console.log('Error on THS config load\n' + e);
 			return false;
 		}

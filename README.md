@@ -33,7 +33,7 @@ from your app's folder to install the module
 _Preliminary notes_ :
 
 * Whenever you modify a setting, the new config isn't written. You have to explicitly call the ```saveConfig()``` method or set `applyNow = true` in methods that allow this parameter. Changes are applied without restarting the tor instance.
-* If you add or remove a hidden service (and apply the modification) while Tor is running, it won't affect the uptime of the other hosted hidden services. Note that this detail is "Tor-specific" and not linked to this module (but I thought it's an interesting thing to know if you're going to host hidden services).
+* ~~If you add or remove a hidden service (and apply the modification) while Tor is running, it won't affect the uptime of the other hosted hidden services. Note that this detail is "Tor-specific" and not linked to this module (but I thought it's an interesting thing to know if you're going to host hidden services).~~
 
 __ths([thsFolder], [socksPortNumber], [controlPortNumber], [torErrorHandler], [torMessageHandler], [torControlMessageHandler])__ :
 

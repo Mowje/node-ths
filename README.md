@@ -127,6 +127,18 @@ __ths.socksPort()__ :
 
 Returns the SOCKS port number Tor process is running on.
 
+__ths.controlPass()__ :
+
+Returns the password you would need to connect an use the current instance's control port
+
+__ths.getTorCommand()__ :
+
+Returns the command that is used by this module in order to spawn Tor. (Default is "tor")
+
+__ths.setTorCommand(torCommand)__ :
+
+Set the command that will be used to spawn a Tor process. Useful if Tor is not in your $PATH and/or you want to indicate where your Tor executable is. Default is "tor" (as written above).
+
 __ths.loadConfig()__ :
 
 (Re)loads the config file. This method is invoked when a ths instance is constructed.

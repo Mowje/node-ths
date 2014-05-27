@@ -9,6 +9,7 @@ module.exports = function(thsFolder, socksPortNumber, controlPortNumber, torErro
 
 	//var fseperator = (os.platform().indexOf('win') == 0) ? '\\' : '/'; //Selects the right path seperator corresponding to the OS platform
 	var fseperator = path.sep;
+	var torCommand = 'tor';
 	var torProcess; //Reference to the tor process
 	var controlClient; //Socket to the tor control port
 
@@ -297,7 +298,7 @@ module.exports = function(thsFolder, socksPortNumber, controlPortNumber, torErro
 				controlPass = pass;
 				controlHash = hash;
 				saveTorrc(torrcFilePath);
-				torProcess = spawn('tor', ['-f', torrcFilePath]);
+				torProcess = spawn(torCommand, ['-f', torrcFilePath]);
 				torProcess.stderr.setEncoding('utf8');
 				torProcess.stderr.on('data', function(data){
 					//console.log('Error from child tor process:\n' + data.toString('utf8'));
@@ -372,6 +373,19 @@ module.exports = function(thsFolder, socksPortNumber, controlPortNumber, torErro
 
 	this.socksPort = function(){
 		return portNumber;
+	};
+
+	this.controlPass = function(){
+		return controlPass;
+	};
+
+	this.getTorCommand = function(){
+		return torCommand;
+	};
+
+	this.setTorCommand = function(_torCommand){
+		if (typeof _torCommand != 'string') throw new TypeError('the torCommand must be a string');
+		torCommand = _torCommand;
 	};
 
 	//Return the newly constructed ths instance

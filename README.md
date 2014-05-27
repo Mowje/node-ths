@@ -34,6 +34,7 @@ _Preliminary notes_ :
 
 * Whenever you modify a setting, the new config isn't written. You have to explicitly call the ```saveConfig()``` method or set `applyNow = true` in methods that allow this parameter. Changes are applied without restarting the tor instance.
 * ~~If you add or remove a hidden service (and apply the modification) while Tor is running, it won't affect the uptime of the other hosted hidden services. Note that this detail is "Tor-specific" and not linked to this module (but I thought it's an interesting thing to know if you're going to host hidden services).~~
+* As of now, if you add/remove a hidden service (and apply the modification) while Tor is running, **all** other hidden services will be unvailable for a while (Tor is rebuilding circuits and re-announcing the hidden services on the network, duration depends on how much hidden services you're hosting). I'm looking for ways to add/remove hidden services without affecting other hidden services. Looking again into the Tor control protocol
 
 __ths([thsFolder], [socksPortNumber], [controlPortNumber], [torErrorHandler], [torMessageHandler], [torControlMessageHandler])__ :
 

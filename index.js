@@ -5,7 +5,7 @@ var net = require('net');
 var path = require('path');
 var passhash = require('./passhash');
 
-module.exports = function(thsFolder, socksPortNumber, controlPortNumber, torErrorHandler, torMessageHandler, torControlMessageHandler){
+module.exports = function(thsFolder, socksPortNumber, controlPortNumber, torErrorHandler, torMessageHandler, torControlMessageHandler, keysFolder){
 
 	//var fseperator = (os.platform().indexOf('win') == 0) ? '\\' : '/'; //Selects the right path seperator corresponding to the OS platform
 	var fseperator = path.sep;
@@ -26,6 +26,7 @@ module.exports = function(thsFolder, socksPortNumber, controlPortNumber, torErro
 	if (torMessageHandler && typeof torMessageHandler != 'function') throw new TypeError('When defined, torMessageHandler must be a function');
 	if (torErrorHandler && typeof torErrorHandler != 'function') throw new TypeError('When defined, torErrorHandler must be a function');
 	if (torControlMessageHandler && typeof torControlMessageHandler != 'function') throw new TypeError('When defined, torControlMessageHandler must be a function');
+	if (keysFolder && typeof keysFolder != 'string') throw new TypeError('When defined, keysFolder must be a string');
 
 	var portNumber = (socksPortNumber || 9999).toString();
 	var controlPort = (controlPortNumber || 9998).toString();
@@ -50,7 +51,7 @@ module.exports = function(thsFolder, socksPortNumber, controlPortNumber, torErro
 	var torrcFilePath = baseFolder + 'torrc';
 	if (!fs.existsSync(torrcFilePath)) saveTorrc(torrcFilePath);
 	//Path to the folder that will contain the private keys and hostnames for each hidden service
-	var hiddenServicePath  = baseFolder + 'keys' + fseperator;
+	var hiddenServicePath = keysFolder || baseFolder + 'keys' + fseperator;
 	if (!fs.existsSync(hiddenServicePath)) fs.mkdirSync(hiddenServicePath);
 
 	/*

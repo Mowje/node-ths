@@ -36,7 +36,7 @@ _Preliminary notes_ :
 * ~~If you add or remove a hidden service (and apply the modification) while Tor is running, it won't affect the uptime of the other hosted hidden services. Note that this detail is "Tor-specific" and not linked to this module (but I thought it's an interesting thing to know if you're going to host hidden services).~~
 * As of now, if you add/remove a hidden service (and apply the modification) while Tor is running, **all** other hidden services will be unvailable for a while (Tor is rebuilding circuits and re-announcing the hidden services on the network, duration depends on how much hidden services you're hosting). I'm looking for ways to add/remove hidden services without affecting other hidden services. Looking again into the Tor control protocol
 
-__ths([thsFolder], [socksPortNumber], [controlPortNumber], [torErrorHandler], [torMessageHandler], [torControlMessageHandler])__ :
+__ths([thsFolder], [socksPortNumber], [controlPortNumber], [torErrorHandler], [torMessageHandler], [torControlMessageHandler], [keysFolder])__ :
 
 Constructor of a node-ths module instance. Note that this constructor calls the ```loadConfig()``` method.
 
@@ -46,6 +46,7 @@ Constructor of a node-ths module instance. Note that this constructor calls the 
 * torErrorHandler: a function that will receive Tor's warnings and error messages (one paramater, as a string). Optional. Not used by default.
 * torMessageHandler : a function that will receive standard Tor info messages (one parameter, as a string). Optional. Not used by default.
 * torControlMessageHandler : a function that will receive the control messages coming from the control port of the Tor process (one parameter, as a string). Optional. Not used by default.
+* keysFolder : a string, a path to the folder where hidden service keys are stored. Optional. Default is thsFolder/ths-data/keys
 
 *Example :*
 

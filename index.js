@@ -117,7 +117,7 @@ module.exports = function(thsFolder, socksPortNumber, controlPortNumber, torErro
 
 	function saveConfig(){
 		if (fs.existsSync(configFilePath)) fs.unlinkSync(configFilePath); //Overwriting didn't seem to work. Hence I delete the file (if it exists) before writing the new config
-		fs.writeFileSync(configFilePath, JSON.stringify(services));
+		fs.writeFileSync(configFilePath, JSON.stringify(services, null, '\t'));
 		saveTorrc(torrcFilePath);
 	};
 

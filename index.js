@@ -159,6 +159,7 @@ module.exports = function(thsFolder, socksPortNumber, controlPortNumber, torErro
 
 	this.removeHiddenService = function(serviceName, applyNow){
 		if (!checkServiceName(serviceName)) throw new TypeError('Invalid service name. It should only contain letters, digits, hyphens and underscore (no spaces allowed)');
+		var found = false;
 		for (var i = 0; i < services.length; i++){
 			if (services[i].name == serviceName) {
 				services.splice(i, 1);
@@ -167,16 +168,22 @@ module.exports = function(thsFolder, socksPortNumber, controlPortNumber, torErro
 					fs.unlinkSync(hiddenServicePath + serviceName + fseperator + containedFiles[j]);
 				}
 				fs.rmdirSync(hiddenServicePath + serviceName);
+				found = true;
+				break;
 			}
 		}
 		if (applyNow){
 			saveConfig();
 			signalReload();
 		}
+		return found;
 	};
 
 	this.rename = function(serviceName, newName){
 		if (!(typeof serviceName == 'string' && typeof newName == 'string')) throw new TypeError('serviceName and newName must be strings');
+		if (!checkServiceName(serviceName)) throw new TypeError('invalid service name');
+		if (!checkServiceName(newName)) throw new TypeError('invalid new service name');
+
 		var found = false;
 		for (var i = 0; i < services.length; i++){
 			if (services[i].name == serviceName){
@@ -259,6 +266,7 @@ module.exports = function(thsFolder, socksPortNumber, controlPortNumber, torErro
 						else throw e;
 					}
 				}
+				break;
 			}
 		}
 		if (torProcess) throw new TypeError('Service name ' + serviceName + ' not found in config');

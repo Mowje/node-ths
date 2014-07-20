@@ -308,11 +308,14 @@ module.exports = function(thsFolder, socksPortNumber, controlPortNumber, torErro
 				controlHash = hash;
 				saveTorrc(torrcFilePath);
 				torProcess = spawn(torCommand, ['-f', torrcFilePath]);
-				torProcess.stderr.setEncoding('utf8');
-				torProcess.stderr.on('data', function(data){
-					//console.log('Error from child tor process:\n' + data.toString('utf8'));
-					if (torErrorHandler) torErrorHandler(data);
-				});
+
+				if (torErrorHandler){ //Attach to stderr if torErrorHandler is defined.
+					torProcess.stderr.setEncoding('utf8');
+					torProcess.stderr.on('data', function(data){
+						//console.log('Error from child tor process:\n' + data.toString('utf8'));
+						torErrorHandler(data);
+					});
+				}
 
 				torProcess.stdout.on('data', function(data){
 					if (data.toString().indexOf('[warn]') > -1 || data.toString().indexOf('[err]') > -1){

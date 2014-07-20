@@ -19,6 +19,12 @@ module.exports = function(globalConfigPath, keysFolder, torInstancesFolder, _hsP
 		if (torProcessOptionsObj.torCommand && typeof torProcessOptionsObj.torCommand != 'string') throw new TypeError('When defined, torCommand must be a string');
 	}
 
+	if (!fs.existsSync(path.join(globalConfigPath, '..'))) fs.mkdirSync(path.join(globalConfigPath, '..'));
+
+	if (fs.existsSync(globalConfigPath)){
+		if (fs.statSync(globalConfigPath).isFile()) loadConfig();
+		else throw new TypeError('the given globalConfigPath is not a file');	}
+
 	var checkServiceName = function(serviceName){
 		var regexCheck = /^[a-zA-Z0-9-_]+$/;
 		return regexCheck.test(serviceName);
@@ -32,6 +38,7 @@ module.exports = function(globalConfigPath, keysFolder, torInstancesFolder, _hsP
 	var instanceServiceList = [];
 	var torProcesses = [];
 	var hsPerProcess = _hsPerProcess || 2500;
+	var torProcessSpawnDelay = _torProcessSpawnDelay || 600000;
 	var processesRunning = false;
 
 	var queueInterval;
@@ -90,6 +97,7 @@ module.exports = function(globalConfigPath, keysFolder, torInstancesFolder, _hsP
 		}
 		if (processesRunning && applyNow){
 			addQueue.push(service);
+			saveConfig();
 		} else {
 			globalServiceList.push(service);
 			if (applyNow) saveConfig();
@@ -231,6 +239,7 @@ module.exports = function(globalConfigPath, keysFolder, torInstancesFolder, _hsP
 
 	this.start = function(force, bootstrapCallback){
 		if (bootstrapCallback && typeof bootstrapCallback != 'function') throw new TypeError('When defined, bootstrapCallback must be a function');
+		saveConfig();
 		buildInstanceFolders(true, function(){
 			torProcesses = [];
 			var numProcesses = Math.ceil(globalServiceList.length / hsPerProcess);
@@ -265,7 +274,7 @@ module.exports = function(globalConfigPath, keysFolder, torInstancesFolder, _hsP
 							torProcesses.push(torInstance);
 							if (processCount == numProcesses){
 								processesRunning = true;
-								queueInterval = setInterval(queueHandler, _torProcessSpawnDelay);
+								queueInterval = setInterval(queueHandler, torProcessSpawnDelay);
 								if (bootstrapCallback) bootstrapCallback();
 							} else spawnOne();
 						});
@@ -340,7 +349,9 @@ module.exports = function(globalConfigPath, keysFolder, torInstancesFolder, _hsP
 			//Create instance folder. Write config file
 			var instanceFolderName = path.join(torInstancesFolder, 'tor-' + (processCounter + 1).toString());
 			if (!fs.existsSync(instanceFolderName)) fs.mkdirSync(instanceFolderName);
-			var configFilePath = path.join(instanceFolderName, 'ths.conf');
+			var thsDataFolderName = path.join(instanceFolderName, 'ths-data');
+			fs.mkdirSync(thsDataFolderName);
+			var configFilePath = path.join(thsDataFolderName, 'ths.conf');
 			fs.writeFileSync(configFilePath, JSON.stringify(currentServiceList, null, '\t'));
 
 			//Push the instance config
@@ -363,7 +374,9 @@ module.exports = function(globalConfigPath, keysFolder, torInstancesFolder, _hsP
 		var folders = fs.readdirSync(torInstancesFolder);
 		var newFolderName = path.join(torInstancesFolder, 'tor-' + folder.length.toString()); //Index + 1
 		fs.mkdirSync(newFolderName);
-		var configFilePath = path.join(newFolderName, 'ths.conf');
+		var thsDataFolderName = path.join(newFolderName, 'ths-data');
+		fs.mkdirSync(thsDataFolderName);
+		var configFilePath = path.join(thsDataFolderName, 'ths.conf');
 		fs.writeFileSync(configFilePath, JSON.stringify(currentQueue, null, '\t'));
 
 		for (var i = 0; i < currentQueue.length; i++){

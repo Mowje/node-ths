@@ -147,3 +147,33 @@ __ths.loadConfig()__ :
 __ths.saveConfig()__ :
 
 Saves the config. Must be called when changes are made to the config (service addition/deletion, ports addition/deletion)
+
+## Tor process pooling
+
+I was looking for ways to add Hidden Services dynamically, while Tor is running, without affecting the other hidden services.
+
+After re-reading the control protocoll, retrying different things with it and reading the Tor sources that manage the "RELOAD" signal, the only way I've found to add Hidden Services dynnmically without affecting the existing ones is to spawn other Tor processes that will handle the new hidden services to be added. Hence, it will be more practical to have a module that will do the multi-process management for us
+
+The THS pool will have a central config file that will contain all the port binding for each hidden service. When starting the pool, there is a threshold of Hidden Services that could be managed by a single Tor process; the module then spawn as many Tor processes as needed to "split equally the main config". After that the pool has been started, hidden services to be created are added to a temporary list that will be processed at a fixed frequency
+
+### Usage :
+
+The THS process pool is implemented in `ths-pool.js`. So here is how we instanciate a pool:
+
+	var ths_pool_builder = require('ths/ths-pool');
+	var ths_pool = ths_pool_builder([args]);
+
+Here is the list of available methods:
+
+__ths_pool(mainConfigFile, keysFolder, torInstancesFolder, [hsPerProcess], [spawnDelay], [torProcessOptions])__ :
+
+* mainConfigFile : path to the main config file. If inexistant it will be created when saving the config, or starting up the process pool
+* keysFolder : folder that (will) contain the hidden service key files. This folder will actually contain one folder per hidden service, and inside each of these folder there will be the `hostname` and `private_key` files
+* torInstancesFolder : folder that will contain the `ths-data` folders for each Tor process instance
+* hsPerProcess : maximum number of hidden services per Tor process. Optional. Defaults to 2500
+* spawnDelay : in milliseconds, interval at which a new Tor process is spawned with the new hidden services to be created. Optional. Defaults to 600000 milliseconds (= 10 minutes)
+* torProcessOptions : optional object containing the different options to be passed to the underlying THS instances :
+	* torErrorHandler : function that will receive Tor error messages (from `stderr`)
+	* torMessageHandler : function that will receive Tor console messages (from `stdout`)
+
+__ths_pool.createHiddenService(serviceName, ports, applyNow)__ :

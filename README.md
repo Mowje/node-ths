@@ -33,6 +33,7 @@ from your app's folder to install the module
 _Preliminary notes_ :
 
 * Whenever you modify a setting, the new config isn't written. You have to explicitly call the ```saveConfig()``` method or set `applyNow = true` in methods that allow this parameter. Changes are applied without restarting the tor instance.
+* To escape an optional parameter and define a parameter that follows, set it to `undefined`
 * ~~If you add or remove a hidden service (and apply the modification) while Tor is running, it won't affect the uptime of the other hosted hidden services. Note that this detail is "Tor-specific" and not linked to this module (but I thought it's an interesting thing to know if you're going to host hidden services).~~
 * As of now, if you add/remove a hidden service (and apply the modification) while Tor is running, **all** other hidden services will be unvailable for a while (Tor is rebuilding circuits and re-announcing the hidden services on the network, duration depends on how much hidden services you're hosting). I'm looking for ways to add/remove hidden services without affecting other hidden services. Looking again into the Tor control protocol
 
@@ -74,12 +75,12 @@ __ths.createHiddenService(serviceName, ports, [applyNow])__ :
 
 Creates a new tor hidden service :
 
+* serviceName : a "human-readable" name for the service. This service's identifier for the node-ths module. It will be asked by some other methods. This name is restricted to alphanumerical chars, hyphens and underscores (no spaces)
 * [port] : Port string or array of port strings. These strings must have the same format/syntax as for a "HiddenServicePort" in a usual torrc config file. This is how it works (harvested from the tor man page) :
 ```
 HiddenServicePort VIRTPORT [TARGET]
 Configure a virtual port VIRTPORT for a hidden service. You may use this option multiple times; each time applies to the service using the most recent hiddenservicedir. By default, this option maps the virtual port to the same port on 127.0.0.1 over TCP. You may override the target port, address, or both by specifying a target of addr, port, or addr:port. You may also have multiple lines with the same VIRTPORT: when a user connects to that VIRTPORT, one of the TARGETs from those lines will be chosen at random.
 ```
-* serviceName : a "human-readable" name for the service. This service's identifier for the node-ths module. It will be asked by some other methods. This name is restricted to alphanumerical chars, hyphens and underscores (no spaces)
 * applyNow : writes the new config on the disk and (if tor is running) sends a 'reload config' signal to the process. Defaults to false.
 
 __ths.removeHiddenService(serviceName, [applyNow])__ :
@@ -158,7 +159,10 @@ The THS pool will have a central config file that will contain all the port bind
 
 ### Usage :
 
-The THS process pool is implemented in `ths-pool.js`. So here is how we instanciate a pool:
+Aside the constructor, the exposed API doesn't change much from the normal THS module (that is described above).
+To escape an optional parameter (in order to set a parameter that follows, for example) set it to `undefined`
+
+The THS process pool is implemented in `ths-pool.js`. So here is how we "instanciate" a pool:
 
 	var ths_pool_builder = require('ths/ths-pool');
 	var ths_pool = ths_pool_builder([args]);
@@ -175,5 +179,62 @@ __ths_pool(mainConfigFile, keysFolder, torInstancesFolder, [hsPerProcess], [spaw
 * torProcessOptions : optional object containing the different options to be passed to the underlying THS instances :
 	* torErrorHandler : function that will receive Tor error messages (from `stderr`)
 	* torMessageHandler : function that will receive Tor console messages (from `stdout`)
+	* torControlMessageHandler : function that will receive the control messages sent from the Tor process (through the control port)
+	* torCommand : the command/relative path to be called when spawning the Tor process. Used to override a global `tor` command
 
-__ths_pool.createHiddenService(serviceName, ports, applyNow)__ :
+__ths_pool.start([force], [callback])__ :
+
+Read the config, splits it and start the Tor process pool
+
+* force : stops a running pool before restarting it. Boolean. Optional. Defaults to false.
+* callback : optional callback function, called when all Tor processes have bootstrapped
+
+__ths_pool.stop([callback])__ :
+
+Stops a running Tor process pool
+
+* callback : optional callback function to be called when all Tor processes have been stopped
+
+__ths_pool.isTorRunning()__ :
+
+Returns a boolean indicating whether the process pool is running or not
+
+__ths_pool.createHiddenService(serviceName, ports, [saveNow])__ :
+
+Creates a new tor hidden service :
+
+* serviceName : a "human-readable" name for the service. This service's identifier for the node-ths module. It will be asked by some other methods. This name is restricted to alphanumerical chars, hyphens and underscores (no spaces)
+* [port] : Port string or array of port strings. These strings must have the same format/syntax as for a "HiddenServicePort" in a usual torrc config file. This is how it works (harvested from the tor man page) :
+```
+HiddenServicePort VIRTPORT [TARGET]
+Configure a virtual port VIRTPORT for a hidden service. You may use this option multiple times; each time applies to the service using the most recent hiddenservicedir. By default, this option maps the virtual port to the same port on 127.0.0.1 over TCP. You may override the target port, address, or both by specifying a target of addr, port, or addr:port. You may also have multiple lines with the same VIRTPORT: when a user connects to that VIRTPORT, one of the TARGETs from those lines will be chosen at random.
+```
+* saveNow : writes the new config on the disk and (if the pool is running) adds the new hidden service to creation queue. The hidden service will be created when a new Tor instance is spawned (afterSpawn delay)
+
+__ths_pool.removeHiddenService(serviceName, [saveNow])__ :
+
+Remove an existing hidden service given it's `serviceName`. Note that this can take effect only when restarting the process pool
+
+* serviceName : the unique name of the service to be deleted
+* saveNow : boolean. if true, save the updated config. Defaults to `false`
+
+__ths_pool.rename(serviceName, newName)__ :
+
+Renames the hidden service. Writes the new config on disk
+
+__ths_pool.addPorts(serviceName, ports, [saveNow])__ :
+
+Add port(s) to an existing hidden service. Takes effect when the process pool is restarted
+
+* serviceName : the service's name
+* ports : port string or array of port strings (as described for `createHiddenService`)
+* saveNow : boolean. if true, save the updated config. Defaults to `false`
+
+__ths_pool.removePorts(serviceName, ports, [deleteIfEmptied], [saveNow])__ :
+
+Remove ports from an existing hidden service. Takes effect when the process pool is restarted
+
+* serviceName : the service's name
+* ports : port string or array of the port strings to be removed
+* deleteIfEmptied : a boolean, determining whether the hidden service should be deleted if there are no more ports entry in it. Defaults to false.
+* saveNow : writes the new config on the disk and (if tor is running) sends a 'reload config' signal to the process. Defaults to false.

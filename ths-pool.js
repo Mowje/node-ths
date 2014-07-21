@@ -97,7 +97,7 @@ module.exports = function(globalConfigPath, keysFolder, torInstancesFolder, _hsP
 		}
 		if (processesRunning && applyNow){
 			addQueue.push(service);
-			saveConfig();
+			//saveConfig();
 		} else {
 			globalServiceList.push(service);
 			if (applyNow) saveConfig();
@@ -267,7 +267,7 @@ module.exports = function(globalConfigPath, keysFolder, torInstancesFolder, _hsP
 						}
 
 						var instanceFolder = path.join(torInstancesFolder, 'tor-' + (processCount + 1).toString());
-						var torInstance = new ths(instanceFolder, socksPort, controlPort, torErrorHandler, torMessageHandler, torControlMessageHandler, keysFolder);
+						var torInstance = ths(instanceFolder, socksPort, controlPort, torErrorHandler, torMessageHandler, torControlMessageHandler, keysFolder);
 						if (torCommand) torInstance.setTorCommand(torCommand);
 						torInstance.start(true, function(){
 							processCount++;
@@ -444,7 +444,7 @@ function getRandomPort(callback){
 		});
 	});
 	function isPortAvailable(){
-		nextPort = Math.round(Math.random() * 32768) + 32767;
+		nextPort = Math.floor(Math.random() * 49152) + 16384;
 		testServer.listen(nextPort);
 	}
 	isPortAvailable();

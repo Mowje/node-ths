@@ -237,4 +237,22 @@ Remove ports from an existing hidden service. Takes effect when the process pool
 * serviceName : the service's name
 * ports : port string or array of the port strings to be removed
 * deleteIfEmptied : a boolean, determining whether the hidden service should be deleted if there are no more ports entry in it. Defaults to false.
-* saveNow : writes the new config on the disk and (if tor is running) sends a 'reload config' signal to the process. Defaults to false.
+* saveNow : boolean. if true, save the updated config. Defaults to `false`
+
+__ths_pool.getServices()__ :
+
+Get the list of running services, with their `name` and array of `ports`
+
+__ths_pool.getOnionAddress(serviceName)__ :
+
+Get the onion address of an existing hidden service, given it's serviceName. Note that this method might return `undefined` even though the hidden service exists (but hasn't been "started" for the first time yet)
+
+* serviceName : name of the service you're looking for
+
+__ths_pool.torPid()__ :
+
+Get the list of Tor processes PIDs. Returns `undefined` if the pool isn't running.
+
+__ths_pool.socksPort()__ :
+
+Get the list of open SOCKS server ports from the running Tor process pool.

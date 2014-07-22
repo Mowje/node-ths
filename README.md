@@ -52,7 +52,7 @@ Constructor of a node-ths module instance. Note that this constructor calls the 
 *Example :*
 
 	var thsBuilder = require('ths');
-	var ths = thsBuilder(__dirname);
+	var ths = new thsBuilder(__dirname);
 
 __ths.start([force], [callback])__ :
 
@@ -125,9 +125,11 @@ __ths.torPid()__ :
 
 Returns the PID of the current Tor process, if it exists.
 
-__ths.socksPort()__ :
+__ths.socksPort([oneRandom])__ :
 
 Returns the SOCKS port number Tor process is running on.
+
+* oneRandom : A boolean determining whether a single random available SOCKS port should be returned, or the entire list (default). Optional parameter. Defaults to false.
 
 __ths.controlPass()__ :
 
@@ -165,7 +167,7 @@ To escape an optional parameter (in order to set a parameter that follows, for e
 The THS process pool is implemented in `ths-pool.js`. So here is how we "instanciate" a pool:
 
 	var ths_pool_builder = require('ths/ths-pool');
-	var ths_pool = ths_pool_builder([args]);
+	var ths_pool = new ths_pool_builder([args]);
 
 Here is the list of available methods:
 

@@ -320,13 +320,18 @@ module.exports = function(globalConfigPath, keysFolder, torInstancesFolder, _hsP
 		return pids;
 	};
 
-	this.socksPort = function(){
+	this.socksPort = function(oneRandom){
 		if (!processesRunning) return;
-		var socks = [];
-		for (var i = 0; i < torProcesses.length; i++){
-			socks.push(torProcesses[i].socksPort());
+		if (oneRandom){
+			var processIndex = Math.floor(Math.random() * torProcesses.length);
+			return torProcesses[processIndex].socksPort();
+		} else {
+			var socks = [];
+			for (var i = 0; i < torProcesses.length; i++){
+				socks.push(torProcesses[i].socksPort());
+			}
+			return socks;
 		}
-		return socks;
 	};
 
 	function buildInstanceFolders(deletePreviousData, callback){

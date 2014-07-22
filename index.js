@@ -65,9 +65,7 @@ module.exports = function(thsFolder, socksPortNumber, controlPortNumber, torErro
 		configFile += 'DataDirectory ' + torDataDir + '\n';
 		configFile += 'HashedControlPassword ' + controlHash + '\n';
 		for (var i = 0; i < services.length; i++){
-			console.log('Torrc service name:"' + services[i].name + '"');
 			var hiddenServiceFolder = path.join(hiddenServicePath, services[i].name);
-			console.log(hiddenServiceFolder);
 			configFile += 'HiddenServiceDir ' + path.join(hiddenServicePath, services[i].name) + '\n';
 			for (var j = 0; j < services[i].ports.length; j++){
 				configFile += 'HiddenServicePort ' + services[i].ports[j] + '\n';

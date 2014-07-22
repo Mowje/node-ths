@@ -37,40 +37,50 @@ module.exports = function(thsFolder, socksPortNumber, controlPortNumber, torErro
 	*/
 
 	//Path to folder that will contain the config file and hidden services' keys
-	var baseFolder = thsFolder || process.cwd();
-	if (baseFolder && !(baseFolder.lastIndexOf(fseperator) == baseFolder.length - 1)) baseFolder += fseperator; //Adding the path seperator if necessary
-	baseFolder += 'ths-data' + fseperator;
-	if (!fs.existsSync(baseFolder)) fs.mkdirSync(baseFolder); //Creating the folder if it doesn't exist
+	var baseFolder = thsFolder ? path.join(process.cwd(), thsFolder) : process.cwd();
+	//if (baseFolder && !(baseFolder.lastIndexOf(fseperator) == baseFolder.length - 1)) baseFolder += fseperator; //Adding the path seperator if necessary
+	baseFolder = path.join(baseFolder, 'ths-data');
+	if (!fs.existsSync(baseFolder)) buildPath(baseFolder); //Creating the folder if it doesn't exist
 	//Path to config file, inside baseFolder
-	var configFilePath =  baseFolder + 'ths.conf';
+	var configFilePath =  path.join(baseFolder, 'ths.conf');
 	if (fs.existsSync(configFilePath)) loadConfig();
 	//Path to DataDirectory folder, necessary for the tor process. Note that each instance must have its own DataDirectory folder, seperate from other instances
-	var torDataDir  = baseFolder + 'torData' + fseperator;
-	if (!fs.existsSync(torDataDir)) fs.mkdirSync(torDataDir); //Creating the DataDirectory if it doesn't exist
-	//Path to the torrc file. Create a basic file it doesn't exist
-	var torrcFilePath = baseFolder + 'torrc';
-	if (!fs.existsSync(torrcFilePath)) saveTorrc(torrcFilePath);
+	var torDataDir = path.join(baseFolder, 'torData');
+	if (!fs.existsSync(torDataDir)) buildPath(torDataDir); //Creating the DataDirectory if it doesn't exist
 	//Path to the folder that will contain the private keys and hostnames for each hidden service
-	var hiddenServicePath = keysFolder || baseFolder + 'keys' + fseperator;
+	var hiddenServicePath = keysFolder || path.join(baseFolder, 'keys');
 	if (!fs.existsSync(hiddenServicePath)) fs.mkdirSync(hiddenServicePath);
+	//Path to the torrc file. Create a basic file it doesn't exist
+	var torrcFilePath = path.join(baseFolder, 'torrc');
+	if (!fs.existsSync(torrcFilePath)) saveTorrc(torrcFilePath);
 
 	/*
 	* Config files and related methods
 	*/
 
-	function saveTorrc(path){
+	function saveTorrc(destPath){
 		var configFile = "";
 		configFile += 'SocksPort ' + portNumber + '\n';
 		configFile += 'ControlPort ' + controlPort + '\n';
 		configFile += 'DataDirectory ' + torDataDir + '\n';
 		configFile += 'HashedControlPassword ' + controlHash + '\n';
 		for (var i = 0; i < services.length; i++){
-			configFile += 'HiddenServiceDir ' + hiddenServicePath + services[i].name + '\n';
+			console.log('Torrc service name:"' + services[i].name + '"');
+			var hiddenServiceFolder = path.join(hiddenServicePath, services[i].name);
+			console.log(hiddenServiceFolder);
+			configFile += 'HiddenServiceDir ' + path.join(hiddenServicePath, services[i].name) + '\n';
 			for (var j = 0; j < services[i].ports.length; j++){
 				configFile += 'HiddenServicePort ' + services[i].ports[j] + '\n';
 			}
 		}
-		fs.writeFileSync(path, configFile);
+		fs.writeFileSync(destPath, configFile);
+	}
+
+	function buildPath(folderPath){
+		if (!(fs.existsSync(folderPath) && fs.statSync(folderPath).isDirectory())){
+			if (!fs.existsSync(path.join(folderPath, '..'))) buildPath(path.join(folderPath, '..'));
+			else fs.mkdirSync(folderPath);
+		}
 	}
 
 	var buildParamArray = function(){
@@ -96,7 +106,7 @@ module.exports = function(thsFolder, socksPortNumber, controlPortNumber, torErro
 		var configLoadObj;
 		var configText
 		try {
-			configText = fs.readFileSync(configFilePath);
+			configText = fs.readFileSync(configFilePath, {encoding: 'utf8'});
 			configLoadObj = JSON.parse(configText);
 		} catch (e) {
 			//throw e;
@@ -165,7 +175,7 @@ module.exports = function(thsFolder, socksPortNumber, controlPortNumber, torErro
 				services.splice(i, 1);
 				var containedFiles = fs.readdirSync(hiddenServicePath + serviceName);
 				for (var j = 0; j < containedFiles.length; j++){
-					fs.unlinkSync(hiddenServicePath + serviceName + fseperator + containedFiles[j]);
+					fs.unlinkSync(path.join(hiddenServicePath, serviceName, containedFiles[j]));
 				}
 				fs.rmdirSync(hiddenServicePath + serviceName);
 				found = true;
@@ -260,7 +270,7 @@ module.exports = function(thsFolder, socksPortNumber, controlPortNumber, torErro
 				var fileReadCount = 0;
 				while (fileReadCount < 3){ //Why did I write this? Answer : Trying 3 times in vain in case the files are not here yet...
 					try {
-						return fs.readFileSync(hiddenServicePath + serviceName + fseperator + 'hostname').toString('utf8').replace('\n', '');
+						return fs.readFileSync(path.join(hiddenServicePath, serviceName, 'hostname')).toString('utf8').replace('\n', '');
 					} catch (e){
 						if (fileReadCount < 3) fileReadCount++;
 						else throw e;
@@ -400,6 +410,4 @@ module.exports = function(thsFolder, socksPortNumber, controlPortNumber, torErro
 		torCommand = _torCommand;
 	};
 
-	//Return the newly constructed ths instance
-	return this;
 };

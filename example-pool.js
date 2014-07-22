@@ -4,15 +4,22 @@
 
 var readline = require('readline');
 var http = require('http');
-var thsBuilder = require('./index');
-var ths = new thsBuilder(undefined, undefined, undefined, console.error, console.log, function(controlMessage){console.log('Ctrl: ' + controlMessage)});
+var thsBuilder = require('./ths-pool');
+var thsConfig = {
+	torErrorHandler: console.error,
+	torMessageHandler: console.log,
+	torControlMessageHandler: function(msg){
+		console.log('Ctrl: ' + msg);
+	}
+};
+var ths = new thsBuilder('./ths-pool/main.conf', './ths-pool/keys/', './ths-pool/instances/', 2, 60000, thsConfig);
 
 var server = http.createServer(function (req, res){
 	res.writeHead(200, {'Content-Type': 'text/plain'});
 	res.end('Hello world!');
 });
-server.listen(2502, '127.0.0.1');
-console.log('Server running at http://127.0.0.1:2502');
+server.listen(2503, '127.0.0.1');
+console.log('Server running at http://127.0.0.1:2503');
 
 var rl = readline.createInterface({input: process.stdin, output: process.stdout});
 rl.setPrompt('ths> ');
@@ -22,8 +29,9 @@ rl.on('line', function(line){
 	line = line.split(' ');
 	switch (line[0]){
 		case 'start':
-			var startCallback = function(){
-				console.log('Tor has been started');
+			var startCallback = function(err){
+				if (err) console.log('Tor start error: ' + err);
+				else console.log('Tor has been started');
 			}
 			if (line.length > 1 && line[1] == 'force'){
 				ths.start(true, startCallback);

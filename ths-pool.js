@@ -19,12 +19,6 @@ module.exports = function(globalConfigPath, keysFolder, torInstancesFolder, _hsP
 		if (torProcessOptionsObj.torCommand && typeof torProcessOptionsObj.torCommand != 'string') throw new TypeError('When defined, torCommand must be a string');
 	}
 
-	if (!fs.existsSync(path.join(globalConfigPath, '..'))) fs.mkdirSync(path.join(globalConfigPath, '..'));
-
-	if (fs.existsSync(globalConfigPath)){
-		if (fs.statSync(globalConfigPath).isFile()) loadConfig();
-		else throw new TypeError('the given globalConfigPath is not a file');	}
-
 	var checkServiceName = function(serviceName){
 		var regexCheck = /^[a-zA-Z0-9-_]+$/;
 		return regexCheck.test(serviceName);
@@ -44,12 +38,19 @@ module.exports = function(globalConfigPath, keysFolder, torInstancesFolder, _hsP
 	var queueInterval;
 	var addQueue = [];
 
+	if (fs.existsSync(globalConfigPath)){
+		if (fs.statSync(globalConfigPath).isFile()){ if (!loadConfig()) console.log('Error while loading existing config'); }
+		else throw new TypeError('the given globalConfigPath is not a file');
+	}
+
+	if (!fs.existsSync(path.join(globalConfigPath, '..'))) fs.mkdirSync(path.join(globalConfigPath, '..'));
+
 	function loadConfig(){
 		if (!(fs.existsSync(globalConfigPath) && fs.statSync(globalConfigPath).isFile())) throw new TypeError('Error while loading config file. Either the path/file doesn\'t exist, or the path isn\'t a file');
 		var configLoadObj;
 		var configText;
 		try {
-			configText = fs.readFileSync(globalConfigPath);
+			configText = fs.readFileSync(globalConfigPath, {encoding: 'utf8'});
 			configLoadObj = JSON.parse(configText);
 		} catch (e){
 			return false;
@@ -67,10 +68,10 @@ module.exports = function(globalConfigPath, keysFolder, torInstancesFolder, _hsP
 	this.loadConfig = loadConfig;
 
 	function saveConfig(){
-		if (fs.existsSync(globalConfigPath)) {
+		/*if (fs.existsSync(globalConfigPath)) {
 			if (!fs.statSync(globalConfigPath).isFile()) throw new TypeError('Error while saving config file. Either the given path/file doesn\'t exists, or the path isn\'t a directory');
 			fs.unlinkSync(globalConfigPath);
-		}
+		}*/
 		fs.writeFileSync(globalConfigPath, JSON.stringify(globalServiceList, null, '\t'));
 		// Anything in addition regarding the tor child processes?
 	}
@@ -201,7 +202,7 @@ module.exports = function(globalConfigPath, keysFolder, torInstancesFolder, _hsP
 	};
 
 	this.getOnionAddress = function(serviceName){
-		if (typeof serviceName == 'string' && checkServiceName(serviceName)) throw new TypeError('invalid service name');
+		if (!(typeof serviceName == 'string' && checkServiceName(serviceName))) throw new TypeError('invalid service name');
 		for (var i = 0; i < globalServiceList.length; i++){
 			if (globalServiceList[i].name == serviceName){
 				var fileReadCount = 0;
@@ -224,10 +225,10 @@ module.exports = function(globalConfigPath, keysFolder, torInstancesFolder, _hsP
 		var servicesCopy = [];
 		for (var i = 0; i < globalServiceList.length; i++){
 			var serviceObjectCopy = {};
-			serviceObjectCopy.name = services[i].name;
+			serviceObjectCopy.name = globalServiceList[i].name;
 			serviceObjectCopy.ports = [];
 			for (var j = 0; j < globalServiceList[i].ports.length; j++){
-				serviceObjectCopy.push(globalServiceList[i].ports[j]);
+				serviceObjectCopy.ports.push(globalServiceList[i].ports[j]);
 			}
 			servicesCopy.push(serviceObjectCopy);
 		}
@@ -267,12 +268,12 @@ module.exports = function(globalConfigPath, keysFolder, torInstancesFolder, _hsP
 						}
 
 						var instanceFolder = path.join(torInstancesFolder, 'tor-' + (processCount + 1).toString());
-						var torInstance = ths(instanceFolder, socksPort, controlPort, torErrorHandler, torMessageHandler, torControlMessageHandler, keysFolder);
+						var torInstance = new ths(instanceFolder, socksPort, controlPort, torErrorHandler, torMessageHandler, torControlMessageHandler, path.join(process.cwd(), keysFolder));
 						if (torCommand) torInstance.setTorCommand(torCommand);
 						torInstance.start(true, function(){
 							processCount++;
 							torProcesses.push(torInstance);
-							if (processCount == numProcesses){
+							if (processCount >= numProcesses){
 								processesRunning = true;
 								queueInterval = setInterval(queueHandler, torProcessSpawnDelay);
 								if (bootstrapCallback) bootstrapCallback();
@@ -334,12 +335,12 @@ module.exports = function(globalConfigPath, keysFolder, torInstancesFolder, _hsP
 		//Delete existing tor instance folder if existent. Create new tor instance folder (torInstancesFolder)
 		if (deletePreviousData && fs.existsSync(torInstancesFolder)) {
 			if (!fs.statSync(torInstancesFolder).isDirectory()) throw new TypeError('Error while building instances config files. Can\'t delete previous files');
-			fs.rmdirSync(torInstancesFolder);
+			deleteFS(torInstancesFolder);
 		}
 		if (!fs.existsSync(torInstancesFolder)) fs.mkdirSync(torInstancesFolder);
 		instanceServiceList = [];
 		var processCounter = 0;
-		while (processCounter * hsPerProcess <= globalServiceList.length){
+		while (processCounter * hsPerProcess < globalServiceList.length){
 			var currentServiceList = [];
 			var startServiceIndex = processCounter * hsPerProcess;
 			var stopServiceIndex = (processCounter + 1) * hsPerProcess;
@@ -350,7 +351,7 @@ module.exports = function(globalConfigPath, keysFolder, torInstancesFolder, _hsP
 			var instanceFolderName = path.join(torInstancesFolder, 'tor-' + (processCounter + 1).toString());
 			if (!fs.existsSync(instanceFolderName)) fs.mkdirSync(instanceFolderName);
 			var thsDataFolderName = path.join(instanceFolderName, 'ths-data');
-			fs.mkdirSync(thsDataFolderName);
+			if (!fs.existsSync(thsDataFolderName)) fs.mkdirSync(thsDataFolderName);
 			var configFilePath = path.join(thsDataFolderName, 'ths.conf');
 			fs.writeFileSync(configFilePath, JSON.stringify(currentServiceList, null, '\t'));
 
@@ -358,13 +359,13 @@ module.exports = function(globalConfigPath, keysFolder, torInstancesFolder, _hsP
 			instanceServiceList.push(currentServiceList);
 			processCounter++;
 		}
-
 		if (callback) callback();
 
 	}
 
 	function queueHandler(){
 		//Copy queue and clear it
+		if (addQueue.length == 0) return; //Exit queue handling if the queue is empty. Saving time and some memory
 		var currentQueue = [];
 		for (var i = 0; i < addQueue.length; i++){
 			currentQueue.push(addQueue[i]);
@@ -372,7 +373,7 @@ module.exports = function(globalConfigPath, keysFolder, torInstancesFolder, _hsP
 		addQueue = [];
 		//Count current instance folders. Create the one that should follow
 		var folders = fs.readdirSync(torInstancesFolder);
-		var newFolderName = path.join(torInstancesFolder, 'tor-' + folder.length.toString()); //Index + 1
+		var newFolderName = path.join(torInstancesFolder, 'tor-' + (folders.length + 1).toString()); //Index + 1
 		fs.mkdirSync(newFolderName);
 		var thsDataFolderName = path.join(newFolderName, 'ths-data');
 		fs.mkdirSync(thsDataFolderName);
@@ -405,42 +406,46 @@ module.exports = function(globalConfigPath, keysFolder, torInstancesFolder, _hsP
 						spawnTor();
 						return;
 					}
-				});
-				if (socksPort == controlPort){
-					spawnTor();
-					return;
-				}
+					if (socksPort == controlPort){
+						spawnTor();
+						return;
+					}
 
-				var torErrorHandler = torProcessOptionsObj ? torProcessOptionsObj.torErrorHandler : undefined;
-				var torMessageHandler = torProcessOptionsObj ? torProcessOptionsObj.torMessageHandler : undefined;
-				var torControlMessageHandler = torProcessOptionsObj ? torProcessOptionsObj.torControlMessageHandler : undefined;
-				var torCommand = torProcessOptionsObj ? torProcessOptionsObj.torCommand : undefined;
+					var torErrorHandler = torProcessOptionsObj ? torProcessOptionsObj.torErrorHandler : undefined;
+					var torMessageHandler = torProcessOptionsObj ? torProcessOptionsObj.torMessageHandler : undefined;
+					var torControlMessageHandler = torProcessOptionsObj ? torProcessOptionsObj.torControlMessageHandler : undefined;
+					var torCommand = torProcessOptionsObj ? torProcessOptionsObj.torCommand : undefined;
 
-				var torInstance = new ths(newFolderName, socksPort, controlPort, torErrorHandler, torMessageHandler, torControlMessageHandler, keysFolder);
-				if (torCommand) torInstance.setTorCommand(torCommand);
-				torInstance.start(true, function(){
-					torProcesses.push(torInstance);
+					var torInstance = new ths(newFolderName, socksPort, controlPort, torErrorHandler, torMessageHandler, torControlMessageHandler, keysFolder);
+					if (torCommand) torInstance.setTorCommand(torCommand);
+					torInstance.start(true, function(){
+						torProcesses.push(torInstance);
+					});
 				});
 			});
 		}
 		spawnTor();
 	}
 
-	return this;
 };
 
 function getRandomPort(callback){
 	if (!(callback && typeof callback == 'function')) throw new TypeError('When defined, callback must be a function');
 
+	var portTestCount = 0;
+	var portTestMax = 5;
+
 	var nextPort;
 	var testServer = net.createServer();
-	testServer.on('error', function(){
-		isPortAvailable();
+	testServer.on('error', function(err){
+		portTestCount++;
+		if (portTestCount < portTestMax) isPortAvailable();
+		else callback(err);
 	});
 	testServer.on('listening', function(){
 		var availablePort = testServer.address().port;
 		testServer.close(function(){
-			callback(availablePort);
+			callback(undefined, availablePort);
 		});
 	});
 	function isPortAvailable(){
@@ -448,4 +453,17 @@ function getRandomPort(callback){
 		testServer.listen(nextPort);
 	}
 	isPortAvailable();
+}
+
+function deleteFS(delPath){
+	if (!fs.existsSync(delPath)) return;
+	var stat = fs.statSync(delPath);
+	if (stat.isFile()) fs.unlinkSync(delPath);
+	else if (stat.isDirectory()){
+		var folderContent = fs.readdirSync(delPath);
+		for (var i = 0; i < folderContent.length; i++){
+			deleteFS(path.join(delPath, folderContent[i]));
+		}
+		fs.rmdirSync(delPath);
+	}
 }

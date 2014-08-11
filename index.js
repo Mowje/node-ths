@@ -74,10 +74,10 @@ module.exports = function(thsFolder, socksPortNumber, controlPortNumber, torErro
 			}
 		}
 		for (var i = 0; i < transports.length; i++){
-			configFile += 'ClientTransportPlugin ' + transports[i].name + ' exec ' +
+			configFile += 'ClientTransportPlugin ' + getTransportLine(transports[i]) + '\n';
 		}
 		for (var i = 0; i < bridges.length; i++){
-			configFile += 'Bridge ' + bridges[i] + '\n';
+			configFile += 'Bridge ' + getBridgeLine(bridges[i]) + '\n';
 		}
 		fs.writeFileSync(destPath, configFile);
 	}
@@ -89,7 +89,7 @@ module.exports = function(thsFolder, socksPortNumber, controlPortNumber, torErro
 		}
 	}
 
-	var buildParamArray = function(){
+	/*var buildParamArray = function(){
 		var params = [];
 		params.push('--DataDirectory');
 		params.push(torDataDir);
@@ -106,7 +106,7 @@ module.exports = function(thsFolder, socksPortNumber, controlPortNumber, torErro
 			}
 		}
 		return params;
-	};
+	};*/
 
 	function loadConfig(){
 		var configLoadObj;
@@ -126,11 +126,12 @@ module.exports = function(thsFolder, socksPortNumber, controlPortNumber, torErro
 					services.push({name: configLoadObj[i].name, ports: configLoadObj[i].ports});
 				}
 			}
-		} else if (Array.isArray(configLoadObj.services) && Array.isArray(configLoadObj.bridges)){
+		} else if (Array.isArray(configLoadObj.services) && Array.isArray(configLoadObj.bridges && Array.isArray(configLoadObj.transports))){
 			services = [];
 			bridges = [];
 			var servicesConfig = configLoadObj.services;
 			var bridgesConfig = configLoadObj.bridges;
+			var transportsConfig = configLoadObj.transports;
 
 			for (var i = 0; i < servicesConfig.length; i++){
 				if (servicesConfig[i].name && servicesConfig[i].ports && Array.isArray(servicesConfig[i].ports)){
@@ -140,7 +141,10 @@ module.exports = function(thsFolder, socksPortNumber, controlPortNumber, torErro
 			for (var i = 0; i < bridgesConfig.length; i++){
 
 			}
-		} else throw new SyntaxError('');
+			for (var i = 0; i < transportsConfig.length; i++){
+
+			}
+		} else throw new SyntaxError('invalid config file');
 		return true;
 	};
 
@@ -148,7 +152,7 @@ module.exports = function(thsFolder, socksPortNumber, controlPortNumber, torErro
 
 	function saveConfig(){
 		if (fs.existsSync(configFilePath)) fs.unlinkSync(configFilePath); //Overwriting didn't seem to work. Hence I delete the file (if it exists) before writing the new config
-		fs.writeFileSync(configFilePath, JSON.stringify({services: services, bridges: bridges}, null, '\t'));
+		fs.writeFileSync(configFilePath, JSON.stringify({services: services, transports: transports, bridges: bridges}, null, '\t'));
 		saveTorrc(torrcFilePath);
 	};
 
@@ -431,18 +435,37 @@ module.exports = function(thsFolder, socksPortNumber, controlPortNumber, torErro
 		torCommand = _torCommand;
 	};
 
+	this.addBridge = function(bridgeLine, save){
+		var parsedBridgeLine = parseBridgeLine(bridgeLine);
+		if (!parsedBridgeLine) return false;
+		bridges.push(parsedBridgeLine);
+		if (save) saveConfig();
+		return true;
+	};
+
+	this.removeBridge = function(bridgeAddress, save){
+		for (var i = 0; i < bridges.length; i++){
+			if (bridges.address == bridgeAddress){
+				bridges.splice(i, 1);
+				if (save) saveConfig();
+				return true;
+			}
+		}
+		return false;
+	};
+
 	this.setBridges = function(newBridges){
 		if (!(newBridges && Array.isArray(newBridges))) throw new TypeError('Invalid type for newBridges parameter; it must be a parameter');
-		for (var i = 0; i < newBridges.length; i++) if (!isBridgeLine(newBridges[i])) throw new TypeError('Invalid bridge line: ' + newBridges[i]);
+		for (var i = 0; i < newBridges.length; i++) if (!(parseBridgeLine(newBridges[i])) throw new TypeError('Invalid bridge line: ' + newBridges[i]);
 
 		bridges = null;
 		bridges = [];
-		for (var i = 0; i < newBridges.length; i++) bridges.push(newBridges[i]);
+		for (var i = 0; i < newBridges.length; i++) bridges.push(parseBridgeLine(newBridges[i]));
 		saveConfig();
 	};
 
 	this.getBridges = function(){
-		var bridgesCopy = new Array(bridges.length);
+		var bridgesCopy = [];
 		for (var i = 0; i < bridges.length; i++){
 			bridgesCopy.push(bridges[i]);
 		}
@@ -451,7 +474,7 @@ module.exports = function(thsFolder, socksPortNumber, controlPortNumber, torErro
 
 	var minBridgeLineLength = 7; //A simple IP. 1.1.1.1 for example
 	var fingerprintRegex = /^[A-F|0-9]{40}$/i;
-	function isBridgeLine(bridgeLine){
+	function parseBridgeLine(bridgeLine){
 		if (typeof bridgeLine != 'string') return false;
 
 		//Removing leading spaces
@@ -463,65 +486,125 @@ module.exports = function(thsFolder, socksPortNumber, controlPortNumber, torErro
 			bridgeLine = bridgeLine.substring(0, bridgeLine.length - 2);
 		}
 		var bridgeLineParts = bridgeLine.split(/ +/);
-		//Checking number of elements in the bridgeline
-		if (!(bridgeLineParts.length == 1 || bridgeLineParts.length == 2 || bridgeLineParts.length == 3)) return false;
+		//Checking number of elements in the bridgeLine
+		if (!(bridgeLineParts.length >= 1 && bridgeLineParts.length <= 3)) return false;
+		var transport, address, fingerprint;
 		if (bridgeLineParts.length == 1){
-			var address = bridgeLineParts[0];
-			var addressParts = address.split(':');
-			if (addressParts.length != 2) return false;
-			var ipAddress = addressParts[0];
-			var portAddress = parseInt(addressParts[1], 10);
-			if (!(net.isIP(ipAddress) && !isNaN(portAddress) && portAddress > 0 && portAddress < 65536)) return false;
+			address = bridgeLineParts[0];
+			if (!isAddressPart(address)) return false;
 
 		} else if (bridgeLineParts.length == 2){
 			if (isAddressPart[bridgeLineParts[0]]){
-				var address = bridgeLineParts[0];
-				var fingerprint = bridgeLineParts[1];
+				address = bridgeLineParts[0];
+				fingerprint = bridgeLineParts[1];
 				if (!isFingerprintPart(fingerprint)) return false;
 			} else if (isAddressPart(bridgeLineParts[1])){
-				var transport = bridgeLineParts[0];
-				var address = bridgeLineParts[1];
+				transport = bridgeLineParts[0];
+				address = bridgeLineParts[1];
 			} else return false;
 		} else {
-			var transport = bridgeLineParts[0];
-			var address = bridgeLineParts[1];
-			var fingerprint = bridgeLineParts[2];
+			transport = bridgeLineParts[0];
+			address = bridgeLineParts[1];
+			fingerprint = bridgeLineParts[2];
 
 			if (!isAddressPart(address)) return false;
 			if (!isFingerprintPart(fingerprint)) return false;
 			//fingerprint = fingerprint.toUpperCase();
 		}
 
-		return true;
-
-		function isAddressPart(part){
-			var addressParts = part.split(':');
-			if (addressParts.length != 2) return false;
-			var ipAddress = addressParts[0];
-			var portAddress = parseInt(addressParts[1], 10);
-			if (!(net.isIP(ipAddress) && !isNaN(portAddress) && portAddress > 0 && portAddress < 65536)) return false;
-			return true;
-		}
-
-		function isFingerprintPart(part){
-			return fingerprintRegex.test(part);
-		}
+		return {transport: transport, address: address, fingerprint: fingerprint.toUpperCase()};
 	}
 
-	this.addTransport = function(transport){
+	function isAddressPart(part){
+		if (typeof part != 'string') return false;
+		var addressParts = part.split(':');
+		if (addressParts.length != 2) return false;
+		var ipAddress = addressParts[0];
+		var portAddress = parseInt(addressParts[1], 10);
+		if (!(net.isIP(ipAddress) && !isNaN(portAddress) && portAddress > 0 && portAddress < 65536)) return false;
+		return true;
+	}
 
+	function isFingerprintPart(part){
+		if (typeof part != 'string') return false;
+		return fingerprintRegex.test(part);
+	}
+
+	function getBridgeLine(bridgeConfigObj){
+		var bridgeLine = '';
+		if (bridgeConfigObj.transport) bridgeLine += bridgeConfigObj.transport + ' ';
+		bridgeLine += bridgeConfigObj.address;
+		if (bridgeConfigObj.fingerprint) bridgeLine += ' ' + bridgeConfigObj.fingerprint;
+		return bridgeLine;
+	}
+
+	this.addTransport = function(transportLine, save){
+		var parsedTransportLine = parseTransportLine(transportLine);
+		if (!parsedTransportLine) return false;
+		transports.push(parsedTransportLine);
+		if (save) saveConfig();
+		return true;
 	};
 
-	this.removeTransport = function(transportName){
-
+	this.removeTransport = function(transportName, save){
+		for (var i = 0; i < transports.length; i++){
+			if (transports[i].name == transportName){
+				transports.splice(i, 1);
+				if (save) saveConfig();
+				return true;
+			}
+		}
+		return false;
 	};
 
 	this.setTransports = function(transportsArray){
+		if (!Array.isArray(transportsArray)) throw new TypeError('transportsArray must be an array');
+		for (var i = 0; i < transportsArray.length; i++) if (!parseTransportLine(transportsArray[i])) throw new TypeError('Transport parameter ' + transportsArray[i] + ' is invalid');
 
+		transports = null;
+		transports = [];
+		for (var i = 0; i < transportsArray.length; i++) transports.push(parseTransportLine(transportsArray[i]));
+		saveConfig();
 	};
 
 	this.getTransports = function(){
-		
+		var transportsCopy = [];
+		for (var i = 0; i < transports.length; i++){
+			transportsCopy.push({name: transports[i].name, type: transports[i].type, parameter: transports[i].parameter});
+		}
+		return transportsCopy;
 	};
+
+	function parseTransportLine(transportLine){
+		if (typeof transportLine != 'string') return false;
+
+		//Remove leading spaces
+		while (transportLine.indexOf(' ') == 0){
+			transportLine = transportLine.substring(1);
+		}
+		//Remove trailing spaces
+		while (transportLine.lastIndexOf(' ') == transportLine.length - 1){
+			transportLine = transportLine.substring(0, transportLine.length - 2);
+		}
+		var transportLineParts = transportLine.split(/ +/);
+		if (transportLineParts.length != 3) return false;
+		var transportName = transportLineParts[0];
+		var transportType = transportLineParts[1];
+		var transportParam = transportLineParts[2];
+		if (!(transportType == 'exec' || transportType == 'socks4' || transportType == 'socks5')) return false;
+		if (transportType == 'exec'){ //Pluggable transport
+			//Should it be validated??
+			//Just check it's a path, for the least
+			var enclosingFolder = path.join(transportParam, '..');
+			if (!fs.existsSync(enclosingFolder)) return false;
+		} else { //Local server transport
+			if (!isAddressPart(transportParam)) return false;
+		}
+		return {name: transportName, type: transportType, parameter: transportParam};
+	}
+
+	function getTransportLine(transportConfigObj){
+		return transportConfigObj.name + ' ' + transportConfigObj.type + ' ' + transportConfigObj.parameter;
+	}
 
 };

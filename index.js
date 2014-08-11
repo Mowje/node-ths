@@ -66,18 +66,18 @@ module.exports = function(thsFolder, socksPortNumber, controlPortNumber, torErro
 		configFile += 'ControlPort ' + controlPort + '\n';
 		configFile += 'DataDirectory ' + torDataDir + '\n';
 		configFile += 'HashedControlPassword ' + controlHash + '\n';
+		for (var i = 0; i < transports.length; i++){
+			configFile += 'ClientTransportPlugin ' + getTransportLine(transports[i]) + '\n';
+		}
+		for (var i = 0; i < bridges.length; i++){
+			configFile += 'Bridge ' + getBridgeLine(bridges[i]) + '\n';
+		}
 		for (var i = 0; i < services.length; i++){
 			var hiddenServiceFolder = path.join(hiddenServicePath, services[i].name);
 			configFile += 'HiddenServiceDir ' + path.join(hiddenServicePath, services[i].name) + '\n';
 			for (var j = 0; j < services[i].ports.length; j++){
 				configFile += 'HiddenServicePort ' + services[i].ports[j] + '\n';
 			}
-		}
-		for (var i = 0; i < transports.length; i++){
-			configFile += 'ClientTransportPlugin ' + getTransportLine(transports[i]) + '\n';
-		}
-		for (var i = 0; i < bridges.length; i++){
-			configFile += 'Bridge ' + getBridgeLine(bridges[i]) + '\n';
 		}
 		fs.writeFileSync(destPath, configFile);
 	}
@@ -129,6 +129,7 @@ module.exports = function(thsFolder, socksPortNumber, controlPortNumber, torErro
 		} else if (Array.isArray(configLoadObj.services) && Array.isArray(configLoadObj.bridges && Array.isArray(configLoadObj.transports))){
 			services = [];
 			bridges = [];
+			transports = [];
 			var servicesConfig = configLoadObj.services;
 			var bridgesConfig = configLoadObj.bridges;
 			var transportsConfig = configLoadObj.transports;
@@ -139,10 +140,14 @@ module.exports = function(thsFolder, socksPortNumber, controlPortNumber, torErro
 				}
 			}
 			for (var i = 0; i < bridgesConfig.length; i++){
-
+				if (bridgesConfig[i].address){
+					bridges.push({transport: bridgesConfig[i].transport, address: bridgesConfig[i].address, fingerprint: bridgesConfig[i].fingerprint});
+				}
 			}
 			for (var i = 0; i < transportsConfig.length; i++){
-
+				if (transportsConfig[i].name && transportsConfig[i].type && transportsConfig[i].parameter){
+					transports.push({name: transportsConfig[i].name, type: transportsConfig[i].type, parameter: transportsConfig[i].parameter});
+				}
 			}
 		} else throw new SyntaxError('invalid config file');
 		return true;

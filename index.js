@@ -126,7 +126,7 @@ module.exports = function(thsFolder, socksPortNumber, controlPortNumber, torErro
 					services.push({name: configLoadObj[i].name, ports: configLoadObj[i].ports});
 				}
 			}
-		} else if (Array.isArray(configLoadObj.services) && Array.isArray(configLoadObj.bridges && Array.isArray(configLoadObj.transports))){
+		} else if (Array.isArray(configLoadObj.services) && Array.isArray(configLoadObj.bridges) && Array.isArray(configLoadObj.transports)){
 			services = [];
 			bridges = [];
 			transports = [];
@@ -450,7 +450,7 @@ module.exports = function(thsFolder, socksPortNumber, controlPortNumber, torErro
 
 	this.removeBridge = function(bridgeAddress, save){
 		for (var i = 0; i < bridges.length; i++){
-			if (bridges.address == bridgeAddress){
+			if (bridges[i].address == bridgeAddress){
 				bridges.splice(i, 1);
 				if (save) saveConfig();
 				return true;
@@ -461,7 +461,7 @@ module.exports = function(thsFolder, socksPortNumber, controlPortNumber, torErro
 
 	this.setBridges = function(newBridges){
 		if (!(newBridges && Array.isArray(newBridges))) throw new TypeError('Invalid type for newBridges parameter; it must be a parameter');
-		for (var i = 0; i < newBridges.length; i++) if (!(parseBridgeLine(newBridges[i])) throw new TypeError('Invalid bridge line: ' + newBridges[i]);
+		for (var i = 0; i < newBridges.length; i++) if (!(parseBridgeLine(newBridges[i]))) throw new TypeError('Invalid bridge line: ' + newBridges[i]);
 
 		bridges = null;
 		bridges = [];
@@ -478,7 +478,7 @@ module.exports = function(thsFolder, socksPortNumber, controlPortNumber, torErro
 	};
 
 	var minBridgeLineLength = 7; //A simple IP. 1.1.1.1 for example
-	var fingerprintRegex = /^[A-F|0-9]{40}$/i;
+	var fingerprintRegex = /^[a-f|0-9]{40}$/i;
 	function parseBridgeLine(bridgeLine){
 		if (typeof bridgeLine != 'string') return false;
 
@@ -499,7 +499,7 @@ module.exports = function(thsFolder, socksPortNumber, controlPortNumber, torErro
 			if (!isAddressPart(address)) return false;
 
 		} else if (bridgeLineParts.length == 2){
-			if (isAddressPart[bridgeLineParts[0]]){
+			if (isAddressPart(bridgeLineParts[0])){
 				address = bridgeLineParts[0];
 				fingerprint = bridgeLineParts[1];
 				if (!isFingerprintPart(fingerprint)) return false;
@@ -514,10 +514,8 @@ module.exports = function(thsFolder, socksPortNumber, controlPortNumber, torErro
 
 			if (!isAddressPart(address)) return false;
 			if (!isFingerprintPart(fingerprint)) return false;
-			//fingerprint = fingerprint.toUpperCase();
 		}
-
-		return {transport: transport, address: address, fingerprint: fingerprint.toUpperCase()};
+		return {transport: transport, address: address, fingerprint: (fingerprint ? fingerprint.toLowerCase() : undefined)};
 	}
 
 	function isAddressPart(part){

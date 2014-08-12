@@ -100,7 +100,7 @@ module.exports = function(globalConfigPath, keysFolder, torInstancesFolder, _hsP
 			if (!fs.statSync(globalConfigPath).isFile()) throw new TypeError('Error while saving config file. Either the given path/file doesn\'t exists, or the path isn\'t a directory');
 			fs.unlinkSync(globalConfigPath);
 		}*/
-		fs.writeFileSync({services: globalConfigPath, bridges: bridges, transports: transports}, JSON.stringify(globalServiceList, null, '\t'));
+		fs.writeFileSync(globalConfigPath, JSON.stringify({services: globalServiceList, bridges: bridges, transports: transports}, null, '\t'));
 		// Anything in addition regarding the tor child processes?
 	}
 

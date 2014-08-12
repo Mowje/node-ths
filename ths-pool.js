@@ -28,8 +28,10 @@ module.exports = function(globalConfigPath, keysFolder, torInstancesFolder, _hsP
 
 	}*/
 
-	var globalServiceList = [];
-	var instanceServiceList = [];
+	var globalServiceList = []; //The list containing all the hidden services managed by the ths-pool
+	var instanceServiceList = []; //The list containing the hidden services managed by the last ths instance configured
+	var bridges = []; //List of bridges to be used by all the Tor processes of the pool
+	var transports = []; //List of transports to be used by all the Tor processes of the pool
 	var torProcesses = [];
 	var hsPerProcess = _hsPerProcess || 2500;
 	var torProcessSpawnDelay = _torProcessSpawnDelay || 600000;
@@ -55,11 +57,37 @@ module.exports = function(globalConfigPath, keysFolder, torInstancesFolder, _hsP
 		} catch (e){
 			return false;
 		}
-		if (!Array.isArray(configLoadObj)) throw new TypeError('service config file must be a JSON array containing hidden services details');
-		globalServiceList = [];
-		for (var i = 0; i < configLoadObj.length; i++){
-			if (configLoadObj[i].name && configLoadObj[i].ports && Array.isArray(configLoadObj[i].ports)){
-				globalServiceList.push({name: configLoadObj[i].name, ports: configLoadObj[i].ports});
+		//if (!Array.isArray(configLoadObj)) throw new TypeError('service config file must be a JSON array containing hidden services details');
+		if (Array.isArray(configLoadObj)){
+			globalServiceList = [];
+			for (var i = 0; i < configLoadObj.length; i++){
+				if (configLoadObj[i].name && configLoadObj[i].ports && Array.isArray(configLoadObj[i].ports)){
+					globalServiceList.push({name: configLoadObj[i].name, ports: configLoadObj[i].ports});
+				}
+			}
+		} else if (Array.isArray(configLoadObj.services) && Array.isArray(configLoadObj.bridges) && Array.isArray(configLoadObj.transports)){
+			globalServiceList = [];
+			bridges = [];
+			transports = [];
+
+			var servicesConfig = configLoadObj.services;
+			var bridgesConfig = configLoadObj.bridges;
+			var transportsConfig = configLoadObj.transports;
+
+			for (var i = 0; i < servicesConfig.length; i++){
+				if (servicesConfig[i].name && servicesConfig[i].ports && Array.isArray(servicesConfig[i].ports)){
+					globalServiceList.push({name: servicesConfig[i].name, ports: servicesConfig[i].ports});
+				}
+			}
+			for (var i = 0; i < bridgesConfig.length; i++){
+				if (bridgesConfig[i].address){
+					bridges.push({transport: bridgesConfig[i].transport, address: bridgesConfig[i].address, fingerprint: bridgesConfig[i].fingerprint});
+				}
+			}
+			for (var i = 0; i < transportsConfig.length; i++){
+				if (transportsConfig[i].name && transportsConfig[i].type && transportsConfig[i].parameter){
+					transports.push({name: transportsConfig[i].name, type: transportsConfig[i].type, parameter: transportsConfig[i].parameter});
+				}
 			}
 		}
 		return true;
@@ -72,7 +100,7 @@ module.exports = function(globalConfigPath, keysFolder, torInstancesFolder, _hsP
 			if (!fs.statSync(globalConfigPath).isFile()) throw new TypeError('Error while saving config file. Either the given path/file doesn\'t exists, or the path isn\'t a directory');
 			fs.unlinkSync(globalConfigPath);
 		}*/
-		fs.writeFileSync(globalConfigPath, JSON.stringify(globalServiceList, null, '\t'));
+		fs.writeFileSync({services: globalConfigPath, bridges: bridges, transports: transports}, JSON.stringify(globalServiceList, null, '\t'));
 		// Anything in addition regarding the tor child processes?
 	}
 
@@ -334,6 +362,43 @@ module.exports = function(globalConfigPath, keysFolder, torInstancesFolder, _hsP
 		}
 	};
 
+	this.addBridge = function(bridgeLine, save){
+		var parsedBridgeLine = parseBridgeLine(bridgeLine);
+		if (!parsedBridgeLine) return false;
+		bridges.push(parsedBridgeLine);
+		if (save) saveConfig();
+		return true;
+	};
+
+	this.removeBridge = function(bridgeAddress, save){
+		for (var i = 0; i < bridges.length; i++){
+			if (bridges[i].address == bridgeAddress){
+				bridges.splice(i, 1);
+				if (save) saveConfig();
+				return true;
+			}
+		}
+		return false;
+	};
+
+	this.setBridges = function(newBridges){
+		if (!(newBridges && Array.isArray(newBridges))) throw new TypeError('Invalid type for newBridges parameter; it must be an array of strings');
+		for (var i = 0; i < newBridges.length; i++) if (!parseBridgeLine(newBridges[i])) throw new TypeError('Invalid bridge line: ' + newBridges[i]);
+
+		bridges = null;
+		bridges = [];
+		for (var i = 0; i < newBridges.length; i++) bridges.push(parseBridgeLine(newBridges[i]));
+		saveConfig();
+	};
+
+	this.getBridges = function(){
+		var bridgesCopy = [];
+		for (var i = 0; i < bridges.length; i++){
+			bridgesCopy.push(bridges[i]);
+		}
+		return bridgesCopy;
+	};
+
 	function buildInstanceFolders(deletePreviousData, callback){
 		if (callback && typeof callback != 'function') throw new TypeError('When defined, callback must be a function');
 
@@ -358,7 +423,7 @@ module.exports = function(globalConfigPath, keysFolder, torInstancesFolder, _hsP
 			var thsDataFolderName = path.join(instanceFolderName, 'ths-data');
 			if (!fs.existsSync(thsDataFolderName)) fs.mkdirSync(thsDataFolderName);
 			var configFilePath = path.join(thsDataFolderName, 'ths.conf');
-			fs.writeFileSync(configFilePath, JSON.stringify(currentServiceList, null, '\t'));
+			fs.writeFileSync(configFilePath, JSON.stringify({services: currentServiceList, bridges: bridges, transports: transports}, null, '\t'));
 
 			//Push the instance config
 			instanceServiceList.push(currentServiceList);
@@ -368,6 +433,140 @@ module.exports = function(globalConfigPath, keysFolder, torInstancesFolder, _hsP
 
 	}
 
+	var minBridgeLineLength = 7; //A simple IP. 1.1.1.1 for example
+	var fingerprintRegex = /^[a-f|0-9]{40}$/i;
+	function parseBridgeLine(bridgeLine){
+		if (typeof bridgeLine != 'string') return false;
+
+		//Removing leading spaces
+		while (bridgeLine.indexOf(' ') == 0 && bridgeLine.length > minBridgeLineLength){
+			bridgeLine = bridgeLine.substring(1);
+		}
+		//Removing trailing spaces
+		while (bridgeLine.lastIndexOf(' ') == bridgeLine.length - 1 && bridgeLine.length > minBridgeLineLength){
+			bridgeLine = bridgeLine.substring(0, bridgeLine.length - 2);
+		}
+		var bridgeLineParts = bridgeLine.split(/ +/);
+		//Checking number of elements in the bridgeLine
+		if (!(bridgeLineParts.length >= 1 && bridgeLineParts.length <= 3)) return false;
+		var transport, address, fingerprint;
+		if (bridgeLineParts.length == 1){
+			address = bridgeLineParts[0];
+			if (!isAddressPart(address)) return false;
+
+		} else if (bridgeLineParts.length == 2){
+			if (isAddressPart(bridgeLineParts[0])){
+				address = bridgeLineParts[0];
+				fingerprint = bridgeLineParts[1];
+				if (!isFingerprintPart(fingerprint)) return false;
+			} else if (isAddressPart(bridgeLineParts[1])){
+				transport = bridgeLineParts[0];
+				address = bridgeLineParts[1];
+			} else return false;
+		} else {
+			transport = bridgeLineParts[0];
+			address = bridgeLineParts[1];
+			fingerprint = bridgeLineParts[2];
+
+			if (!isAddressPart(address)) return false;
+			if (!isFingerprintPart(fingerprint)) return false;
+		}
+		return {transport: transport, address: address, fingerprint: (fingerprint ? fingerprint.toLowerCase() : undefined)};
+	}
+
+	function isAddressPart(part){
+		if (typeof part != 'string') return false;
+		var addressParts = part.split(':');
+		if (addressParts.length != 2) return false;
+		var ipAddress = addressParts[0];
+		var portAddress = parseInt(addressParts[1], 10);
+		if (!(net.isIP(ipAddress) && !isNaN(portAddress) && portAddress > 0 && portAddress < 65536)) return false;
+		return true;
+	}
+
+	function isFingerprintPart(part){
+		if (typeof part != 'string') return false;
+		return fingerprintRegex.test(part);
+	}
+
+	function getBridgeLine(bridgeConfigObj){
+		var bridgeLine = '';
+		if (bridgeConfigObj.transport) bridgeLine += bridgeConfigObj.transport + ' ';
+		bridgeLine += bridgeConfigObj.address;
+		if (bridgeConfigObj.fingerprint) bridgeLine += ' ' + bridgeConfigObj.fingerprint;
+		return bridgeLine;
+	}
+
+	this.addTransport = function(transportLine, save){
+		var parsedTransportLine = parseTransportLine(transportLine);
+		if (!parsedTransportLine) return false;
+		transports.push(parsedTransportLine);
+		if (save) saveConfig();
+		return true;
+	};
+
+	this.removeTransport = function(transportName, save){
+		for (var i = 0; i < transports.length; i++){
+			if (transports[i].name == transportName){
+				transports.splice(i, 1);
+				if (save) saveConfig();
+				return true;
+			}
+		}
+		return false;
+	};
+
+	this.setTransports = function(transportsArray){
+		if (!Array.isArray(transportsArray)) throw new TypeError('transportsArray must be an array');
+		for (var i = 0; i < transportsArray.length; i++) if (!parseTransportLine(transportsArray[i])) throw new TypeError('Transport parameter ' + transportsArray[i] + ' is invalid');
+
+		transports = null;
+		transports = [];
+		for (var i = 0; i < transportsArray.length; i++) transports.push(parseTransportLine(transportsArray[i]));
+		saveConfig();
+	};
+
+	this.getTransports = function(transportName){
+		var transportsCopy = [];
+		for (var i = 0; i < transports.length; i++){
+			transportsCopy.push({name: transports[i].name, type: transports[i].type, parameter: transports[i].parameter});
+		}
+		return transportsCopy;
+	};
+
+	function parseTransportLine(transportLine){
+		if (typeof transportLine != 'string') return false;
+
+		//Remove leading spaces
+		while (transportLine.indexOf(' ') == 0){
+			transportLine = transportLine.substring(1);
+		}
+		//Remove trailing spaces
+		while (transportLine.lastIndexOf(' ') == transportLine.length - 1){
+			transportLine = transportLine.substring(0, transportLine.length - 2);
+		}
+		var transportLineParts = transportLine.split(/ +/);
+		if (transportLineParts.length != 3) return false;
+		var transportName = transportLineParts[0];
+		var transportType = transportLineParts[1];
+		var transportParam = transportLineParts[2];
+		if (!(transportType == 'exec' || transportType == 'socks4' || transportType == 'socks5')) return false;
+		if (transportType == 'exec'){ //Pluggable transport
+			//Should it be validated??
+			//Just check it's a path, for the least
+			var enclosingFolder = path.join(transportParam, '..');
+			if (!fs.existsSync(enclosingFolder)) return false;
+		} else { //Local server transport
+			if (!isAddressPart(transportParam)) return false;
+		}
+		return {name: transportName, type: transportType, parameter: transportParam};
+	}
+
+	function getTransportLine(transportConfigObj){
+		return transportConfigObj.name + ' ' + transportConfigObj.type + ' ' + transportConfigObj.parameter;
+	}
+
+	//Queue handler, called periodically to spawn a new tor instance that will host the newly added hidden services
 	function queueHandler(){
 		//Copy queue and clear it
 		if (addQueue.length == 0) return; //Exit queue handling if the queue is empty. Saving time and some memory
@@ -383,7 +582,7 @@ module.exports = function(globalConfigPath, keysFolder, torInstancesFolder, _hsP
 		var thsDataFolderName = path.join(newFolderName, 'ths-data');
 		fs.mkdirSync(thsDataFolderName);
 		var configFilePath = path.join(thsDataFolderName, 'ths.conf');
-		fs.writeFileSync(configFilePath, JSON.stringify(currentQueue, null, '\t'));
+		fs.writeFileSync(configFilePath, JSON.stringify({services: currentQueue, bridges: bridges, transports: transports}, null, '\t'));
 
 		for (var i = 0; i < currentQueue.length; i++){
 			globalServiceList.push(currentQueue[i]);

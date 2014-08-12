@@ -460,7 +460,7 @@ module.exports = function(thsFolder, socksPortNumber, controlPortNumber, torErro
 	};
 
 	this.setBridges = function(newBridges){
-		if (!(newBridges && Array.isArray(newBridges))) throw new TypeError('Invalid type for newBridges parameter; it must be a parameter');
+		if (!(newBridges && Array.isArray(newBridges))) throw new TypeError('Invalid type for newBridges parameter; it must be an array of strings');
 		for (var i = 0; i < newBridges.length; i++) if (!(parseBridgeLine(newBridges[i]))) throw new TypeError('Invalid bridge line: ' + newBridges[i]);
 
 		bridges = null;

@@ -143,13 +143,48 @@ rl.on('line', function(line){
 			break;
 		case 'listbridges':
 			var bridgesList = ths.getBridges();
-			console.log('Bridges');
+			if (bridgesList.length == 0){
+				console.log('No bridges were added');
+				break;
+			}
+			console.log('Bridges:');
 			for (var i = 0; i < bridgesList.length; i++){
 				var bridgeLine = '';
 				if (bridgesList[i].transport) bridgeLine += bridgesList[i].transport + ' ';
 				bridgeLine += bridgesList[i].address;
 				if (bridgesList[i].fingerprint) bridgeLine += ' ' + bridgesList[i].fingerprint;
 				console.log(bridgeLine);
+			}
+			break;
+		case 'addtransport':
+			if (line.length == 4){
+				var transportLine = '';
+				for (var i = 1; i < line.length; i++){
+					transportLine += line[i];
+					if (i != line.length - 1) transportLine += ' ';
+				}
+				ths.addTransport(transportLine, true);
+			} else {
+				console.log('Invalid command. Syntax addtransport transportName exec pathToBinary, or addtransport transportName socks4|socks5 IP:Port');
+			}
+			break;
+		case 'removetransport':
+			if (line.length > 1){
+				var transportName = line[1];
+				ths.removeTransport(transportName, true);
+			} else {
+				console.log('Invalid command. Syntax removetransport transportName');
+			}
+			break;
+		case 'listtransports':
+			var transportsList = ths.getTransports();
+			if (transportsList.length == 0){
+				console.log('No transports were added');
+				break;
+			}
+			console.log('Transports:');
+			for (var i = 0; i < transportsList.length; i++){
+				console.log(transportsList[i].name + ' ' + transportsList[i].type + ' ' + transportsList[i].parameter);
 			}
 			break;
 		case 'pid':
@@ -174,6 +209,9 @@ rl.on('line', function(line){
 				'addbridge [transport] bridgeIP:bridgePort [fingerprint]  -- Add a Tor bridge to be used by the instance\n' +
 				'removebridge bridgeIP:bridgePort  -- Remove a bridge for this instance\n' +
 				'listbridges  -- List the bridges to be used by this instance\n' +
+				'addtransport transportName type parameter  -- Add a pluggable transport to the Tor instance\n' +
+				'removetransport transportName  -- Remove a pluggable transport\n' +
+				'listtransports  -- List the added pluggable transports\n' +
 				'pid  -- Get the tor process PID\n' +
 				'exit  -- Exit this program');
 			break;

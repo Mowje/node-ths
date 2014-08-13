@@ -129,6 +129,75 @@ rl.on('line', function(line){
 				console.log('Invalid command. Syntax : removeport service-name port1 [port2,...]');
 			}
 			break;
+		case 'addbridge':
+			if (line.length > 1 && line.length <= 4){
+				var bridgeLine = '';
+				for (var i = 1; i < line.length; i++){
+					bridgeLine += line[i];
+					if (i != line.length - 1) bridgeLine += ' ';
+				}
+				ths.addBridge(bridgeLine, true);
+			} else {
+				console.log('Invalid command. Syntax : addbridge [transportName] bridgeIP:bridgePort [fingerprint]');
+			}
+			break;
+		case 'removebridge':
+			if (line.length > 1){
+				var bridgeAddress = line[1];
+				ths.removeBridge(bridgeAddress, true);
+			} else {
+				console.log('Invalid command. Syntax : removebridge bridgeAddress');
+			}
+			break;
+		case 'listbridges':
+			var bridgesList = ths.getBridges();
+			if (bridgesList.length == 0){
+				console.log('No bridges were added');
+				break;
+			}
+			console.log('Bridges:');
+			for (var i = 0; i < bridgesList.length; i++){
+				var bridgeLine = '';
+				if (bridgesList[i].transport) bridgeLine += bridgesList[i].transport + ' ';
+				bridgeLine += bridgesList[i].address;
+				if (bridgesList[i].fingerprint) bridgeLine += ' ' + bridgesList[i].fingerprint;
+				console.log(bridgeLine);
+			}
+			break;
+		case 'clearbridges':
+			ths.clearBridges();
+			break;
+		case 'addtransport':
+			if (line.length == 4){
+				var transportLine = '';
+				for (var i = 1; i < line.length; i++){
+					transportLine += line[i];
+					if (i != line.length - 1) transportLine += ' ';
+				}
+				ths.addTransport(transportLine, true);
+			} else {
+				console.log('Invalid command. Syntax addtransport transportName exec pathToBinary, or addtransport transportName socks4|socks5 IP:Port');
+			}
+			break;
+		case 'removetransport':
+			if (line.length > 1){
+				var transportName = line[1];
+				ths.removeTransport(transportName, true);
+			} else {
+				console.log('Invalid command. Syntax removetransport transportName');
+			}
+			break;
+		case 'listtransports':
+			var transportsList = ths.getTransports();
+			if (transportsList.length == 0){
+				console.log('No transports were added');
+				break;
+			}
+			console.log('Transports:');
+			for (var i = 0; i < transportsList.length; i++){
+				console.log(transportsList[i].name + ' ' + transportsList[i].type + ' ' + transportsList[i].parameter);
+			}
+			break;
 		case 'pid':
 			if (ths.isTorRunning()){
 				console.log('Tor PID : ' + ths.torPid());
@@ -148,6 +217,13 @@ rl.on('line', function(line){
 				'rename oldServiceName newServiceName  -- Rename in the config the "oldServiceName" service into "newServiceName"\n' +
 				'addport serviceName port1 target1 [port2 target2 ...]  -- Add ports to service "serviceName"\n' +
 				'removeport serviceName  -- Remove ports from "serviceName"\n' +
+				'addbridge [transport] bridgeIP:bridgePort [fingerprint]  -- Add a Tor bridge to be used by the instance\n' +
+				'removebridge bridgeIP:bridgePort  -- Remove a bridge for this instance\n' +
+				'listbridges  -- List the bridges to be used by this instance\n' +
+				'clearbridges  -- Clear the list of bridges\n' +
+				'addtransport transportName type parameter  -- Add a pluggable transport to the Tor instance\n' +
+				'removetransport transportName  -- Remove a pluggable transport\n' +
+				'listtransports  -- List the added pluggable transports\n' +
 				'pid  -- Get the tor process PID\n' +
 				'exit  -- Exit this program');
 			break;

@@ -1,7 +1,7 @@
 # node-ths [![NPM version](https://badge.fury.io/js/ths.svg)](http://badge.fury.io/js/ths)
 
 
-node-ths (node - Tor Hidden Services) is a node.js module allowing you to create and manage [Tor hidden services](https://www.torproject.org/docs/hidden-services) from your app.
+node-ths (node - Tor Hidden Services) is a node.js module allowing you to create and manage [Tor hidden services](https://www.torproject.org/docs/hidden-services) from your app, as well as simply starting a Tor instance.
 
 ## Overview
 
@@ -9,10 +9,12 @@ Part of a bigger project, I needed to be able to to create and manage programmat
 
 With this module, you can :
 
+* Start a tor instance. Can use bridges and pluggable transports
 * Create and delete hidden services
 * Adding and removing port bindings to existing hidden services
+* Have a pool of tor instances that have all of these features
 
-When you start this module, it runs a dedicated instance of Tor for the hidden services. It writes a dedicated torrc file. Whenever you change a setting, the torrc file is update and the config is reload through a signal sent on the tor control port.
+When you start this module, it runs a dedicated instance of Tor. It writes a dedicated torrc file. Whenever you change a setting, the torrc file is update and the config is reload through a signal sent on the tor control port.
 
 ## Requirements
 
@@ -150,6 +152,58 @@ __ths.saveConfig()__ :
 
 Saves the config. Must be called when changes are made to the config (service addition/deletion, ports addition/deletion)
 
+__ths.addBridge(bridgeLine, save)__ :
+
+Add a bridge to be used as a client. Returns true if the bridgeLine is correctly formated, false otherwise
+* bridgeLine : a string, built as described in the tor man page for the Bridge parameter in the torrc file:
+```
+[transport] IP:ORPort [fingerprint]
+```
+* save : a boolean, determining whether the new config should be written now on disk or not
+
+__ths.removeBridge(bridgeAddress, save)__ :
+
+Remove a bridge given its `IP:ORPort`. Returns true if the bridge has been removed, false otherwise
+* bridgeAddress: a string, containing the IP and Tor relay port seperated by a colon ("1.2.3.4:443", for example)
+* save : a boolean, determining whether the new config should be saved on disk now or not
+
+__ths.setBridges(bridgeLineArray)__ :
+
+Set the list of bridges to be used by the Tor instance. Throws an exception if one of the bridge lines is invalid. Writes the new config to disk
+
+__ths.getBridges()__ :
+
+Returns the array of bridge parameters that are used by the instance
+
+__ths.clearBridges()__ :
+
+Clear the list of bridges. Equals to `ths.setBridges([])`
+
+__ths.addTransport(transportLine, save)__ :
+Add a pluggable transport to be used with bridges
+* transportLine : string, built as described in the tor man page for the ClientTransportPlugin parameter in the torrc file
+```
+transportName exec pathToBinary
+```
+or
+```
+transportName socks4|socks5 ip:port
+```
+* save : a boolean, determining whether the new config should be saved on disk now or not
+
+__ths.removeTransport(transportName, save)__ :
+Remove a pluggable transport config based on its name. Returns true if it was successfully removed, false otherwise
+* transportName : a string, containing the name of the pluggable transport as used at its addition
+* save : a boolean, determining whether the new config should be saved on disk now or not
+
+__ths.setTransports(transportsArray)__ :
+Set the pluggable transports to be used by the Tor instance. Writes the new config to disk
+* transportsArray : Array<String> containing transportLines, as in `addTransport()`. The method throws an exception if one the tranportLines is invalid.
+
+__ths.getTransports()__ :
+Return a list of the configured pluggable transports, as an array of transportLines
+
+
 ## Tor process pooling
 
 I was looking for ways to add Hidden Services dynamically, while Tor is running, without affecting the other hidden services.
@@ -257,3 +311,55 @@ Get the list of Tor processes PIDs. Returns `undefined` if the pool isn't runnin
 __ths_pool.socksPort()__ :
 
 Get the list of open SOCKS server ports from the running Tor process pool.
+
+__ths_pool.addBridge(bridgeLine, save)__ :
+
+Add a bridge to be used as a client. Returns true if the bridgeLine is correctly formated, false otherwise
+
+* bridgeLine : a string, built as described in the tor man page for the Bridge parameter in the torrc file:
+```
+[transport] IP:ORPort [fingerprint]
+```
+* save : a boolean, determining whether the new config is saved on disk at the end of the method or not
+
+__ths_pool.removeBridge(bridgeAddress, save)__ :
+
+Remove a bridge given its `IP:ORPort`. Returns true if the bridge has been removed, false otherwise
+* bridgeAddress: a string, containing the IP and Tor relay port seperated by a colon ("1.2.3.4:443", for example)
+* save : a boolean, determining whether the new config should be saved on disk now or not
+
+__ths_pool.setBridges(bridgeLineArray)__ :
+
+Set the list of bridges to be used by the Tor pool's instances. Throws an exception if one of the bridge lines is invalid. Saves the new config to disk
+
+__ths_pool.getBridges()__ :
+
+Returns the array of bridge parameters that are used by the pool's instances
+
+__ths_pool.clearBridges()__ :
+
+Clear the list of bridges. Equals to `ths_pool.setBridges([])`
+
+__ths_pool.addTransport(transportLine, save)__ :
+Add a pluggable transport to be used with bridges
+* transportLine : string, built as described in the tor man page for the ClientTransportPlugin parameter in the torrc file
+```
+transportName exec pathToBinary
+```
+or
+```
+transportName socks4|socks5 ip:port
+```
+* save : a boolean, determining whether the new config should be written now on disk or not
+
+__ths_pool.removeTransport(transportName, save)__ :
+Remove a pluggable transport config based on its name. Returns true if it was successfully removed, false otherwise
+* transportName: a string, containing the transport's name
+* save : a boolean, determining whether the new config should be written now on disk or not
+
+__ths_pool.setTransports(transportsArray)__ :
+Set the pluggable transports to be used by the pool's instances. Writes the new config to disk
+* transportsArray : Array<String> containing transportLines, as in `addTransport()`. The method throws an exception if one the tranportLines is invalid.
+
+__ths_pool.getTransports()__ :
+Return a list of the configured pluggable transports, as an array of transportLines

@@ -69,6 +69,7 @@ module.exports = function(thsFolder, socksPortNumber, controlPortNumber, torErro
 		for (var i = 0; i < transports.length; i++){
 			configFile += 'ClientTransportPlugin ' + getTransportLine(transports[i]) + '\n';
 		}
+		if (bridges.length > 0) configFile += 'UseBridges 1\n';
 		for (var i = 0; i < bridges.length; i++){
 			configFile += 'Bridge ' + getBridgeLine(bridges[i]) + '\n';
 		}
@@ -467,6 +468,10 @@ module.exports = function(thsFolder, socksPortNumber, controlPortNumber, torErro
 		bridges = [];
 		for (var i = 0; i < newBridges.length; i++) bridges.push(parseBridgeLine(newBridges[i]));
 		saveConfig();
+	};
+
+	this.clearBridges = function(){
+		this.setBridges([]);
 	};
 
 	this.getBridges = function(){

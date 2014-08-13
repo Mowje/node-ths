@@ -1,7 +1,7 @@
 {
   "name": "ths",
-  "version": "2.0.0",
-  "description": "A module that lets you create Tor hidden services from node.js",
+  "version": "2.1.0",
+  "description": "A module that lets you start a Tor instance, use bridges and create Tor hidden services from node.js",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"

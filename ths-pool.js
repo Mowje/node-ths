@@ -391,6 +391,10 @@ module.exports = function(globalConfigPath, keysFolder, torInstancesFolder, _hsP
 		saveConfig();
 	};
 
+	this.clearBridges = function(){
+		this.setBridges([]);
+	};
+
 	this.getBridges = function(){
 		var bridgesCopy = [];
 		for (var i = 0; i < bridges.length; i++){
@@ -398,40 +402,6 @@ module.exports = function(globalConfigPath, keysFolder, torInstancesFolder, _hsP
 		}
 		return bridgesCopy;
 	};
-
-	function buildInstanceFolders(deletePreviousData, callback){
-		if (callback && typeof callback != 'function') throw new TypeError('When defined, callback must be a function');
-
-		//Delete existing tor instance folder if existent. Create new tor instance folder (torInstancesFolder)
-		if (deletePreviousData && fs.existsSync(torInstancesFolder)) {
-			if (!fs.statSync(torInstancesFolder).isDirectory()) throw new TypeError('Error while building instances config files. Can\'t delete previous files');
-			deleteFS(torInstancesFolder);
-		}
-		if (!fs.existsSync(torInstancesFolder)) fs.mkdirSync(torInstancesFolder);
-		instanceServiceList = [];
-		var processCounter = 0;
-		while (processCounter * hsPerProcess < globalServiceList.length){
-			var currentServiceList = [];
-			var startServiceIndex = processCounter * hsPerProcess;
-			var stopServiceIndex = (processCounter + 1) * hsPerProcess;
-			for (var i = startServiceIndex, j = 0; i < stopServiceIndex && i < globalServiceList.length; i++, j++){
-				currentServiceList[j] = {name: globalServiceList[i].name, ports: globalServiceList[i].ports};
-			}
-			//Create instance folder. Write config file
-			var instanceFolderName = path.join(torInstancesFolder, 'tor-' + (processCounter + 1).toString());
-			if (!fs.existsSync(instanceFolderName)) fs.mkdirSync(instanceFolderName);
-			var thsDataFolderName = path.join(instanceFolderName, 'ths-data');
-			if (!fs.existsSync(thsDataFolderName)) fs.mkdirSync(thsDataFolderName);
-			var configFilePath = path.join(thsDataFolderName, 'ths.conf');
-			fs.writeFileSync(configFilePath, JSON.stringify({services: currentServiceList, bridges: bridges, transports: transports}, null, '\t'));
-
-			//Push the instance config
-			instanceServiceList.push(currentServiceList);
-			processCounter++;
-		}
-		if (callback) callback();
-
-	}
 
 	var minBridgeLineLength = 7; //A simple IP. 1.1.1.1 for example
 	var fingerprintRegex = /^[a-f|0-9]{40}$/i;
@@ -564,6 +534,41 @@ module.exports = function(globalConfigPath, keysFolder, torInstancesFolder, _hsP
 
 	function getTransportLine(transportConfigObj){
 		return transportConfigObj.name + ' ' + transportConfigObj.type + ' ' + transportConfigObj.parameter;
+	}
+
+	//Builds the folder containing the config for all tor instances
+	function buildInstanceFolders(deletePreviousData, callback){
+		if (callback && typeof callback != 'function') throw new TypeError('When defined, callback must be a function');
+
+		//Delete existing tor instance folder if existent. Create new tor instance folder (torInstancesFolder)
+		if (deletePreviousData && fs.existsSync(torInstancesFolder)) {
+			if (!fs.statSync(torInstancesFolder).isDirectory()) throw new TypeError('Error while building instances config files. Can\'t delete previous files');
+			deleteFS(torInstancesFolder);
+		}
+		if (!fs.existsSync(torInstancesFolder)) fs.mkdirSync(torInstancesFolder);
+		instanceServiceList = [];
+		var processCounter = 0;
+		while (processCounter * hsPerProcess < globalServiceList.length){
+			var currentServiceList = [];
+			var startServiceIndex = processCounter * hsPerProcess;
+			var stopServiceIndex = (processCounter + 1) * hsPerProcess;
+			for (var i = startServiceIndex, j = 0; i < stopServiceIndex && i < globalServiceList.length; i++, j++){
+				currentServiceList[j] = {name: globalServiceList[i].name, ports: globalServiceList[i].ports};
+			}
+			//Create instance folder. Write config file
+			var instanceFolderName = path.join(torInstancesFolder, 'tor-' + (processCounter + 1).toString());
+			if (!fs.existsSync(instanceFolderName)) fs.mkdirSync(instanceFolderName);
+			var thsDataFolderName = path.join(instanceFolderName, 'ths-data');
+			if (!fs.existsSync(thsDataFolderName)) fs.mkdirSync(thsDataFolderName);
+			var configFilePath = path.join(thsDataFolderName, 'ths.conf');
+			fs.writeFileSync(configFilePath, JSON.stringify({services: currentServiceList, bridges: bridges, transports: transports}, null, '\t'));
+
+			//Push the instance config
+			instanceServiceList.push(currentServiceList);
+			processCounter++;
+		}
+		if (callback) callback();
+
 	}
 
 	//Queue handler, called periodically to spawn a new tor instance that will host the newly added hidden services

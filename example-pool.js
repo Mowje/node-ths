@@ -164,6 +164,9 @@ rl.on('line', function(line){
 				console.log(bridgeLine);
 			}
 			break;
+		case 'clearbridges':
+			ths.clearBridges();
+			break;
 		case 'addtransport':
 			if (line.length == 4){
 				var transportLine = '';
@@ -217,6 +220,7 @@ rl.on('line', function(line){
 				'addbridge [transport] bridgeIP:bridgePort [fingerprint]  -- Add a Tor bridge to be used by the instance\n' +
 				'removebridge bridgeIP:bridgePort  -- Remove a bridge for this instance\n' +
 				'listbridges  -- List the bridges to be used by this instance\n' +
+				'clearbridges  -- Clear the list of bridges\n' +
 				'addtransport transportName type parameter  -- Add a pluggable transport to the Tor instance\n' +
 				'removetransport transportName  -- Remove a pluggable transport\n' +
 				'listtransports  -- List the added pluggable transports\n' +

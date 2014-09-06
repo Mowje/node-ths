@@ -578,7 +578,7 @@ module.exports = function(thsFolder, socksPortNumber, controlPortNumber, torErro
 	this.getTransports = function(){
 		var transportsCopy = [];
 		for (var i = 0; i < transports.length; i++){
-			transportsCopy.push({name: transports[i].name, type: transports[i].type, parameter: transports[i].parameter});
+			transportsCopy.push({name: transports[i].name, type: transports[i].type, parameter: transports[i].parameter, args: transports[i].args});
 		}
 		return transportsCopy;
 	};
@@ -595,10 +595,14 @@ module.exports = function(thsFolder, socksPortNumber, controlPortNumber, torErro
 			transportLine = transportLine.substring(0, transportLine.length - 2);
 		}
 		var transportLineParts = transportLine.split(/ +/);
-		if (transportLineParts.length != 3) return false;
+		if (transportLineParts.length < 3) return false;
 		var transportName = transportLineParts[0];
 		var transportType = transportLineParts[1];
 		var transportParam = transportLineParts[2];
+		var transportArgs = [];
+		for (var i = 3; i < transportLineParts.length; i++){
+			transportArgs.push(transportLineParts[i]);
+		}
 		if (!(transportType == 'exec' || transportType == 'socks4' || transportType == 'socks5')) return false;
 		if (transportType == 'exec'){ //Pluggable transport
 			//Should it be validated??
@@ -608,11 +612,11 @@ module.exports = function(thsFolder, socksPortNumber, controlPortNumber, torErro
 		} else { //Local server transport
 			if (!isAddressPart(transportParam)) return false;
 		}
-		return {name: transportName, type: transportType, parameter: transportParam};
+		return {name: transportName, type: transportType, parameter: transportParam, args: transportArgs};
 	}
 
 	function getTransportLine(transportConfigObj){
-		return transportConfigObj.name + ' ' + transportConfigObj.type + ' ' + transportConfigObj.parameter;
+		return transportConfigObj.name + ' ' + transportConfigObj.type + ' ' + transportConfigObj.parameter + (transportConfigObj.args.length > 0 ? ' ' + transportConfigObj.args.join(' ') : '');
 	}
 
 };

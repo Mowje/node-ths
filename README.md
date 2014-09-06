@@ -183,7 +183,7 @@ __ths.addTransport(transportLine, save)__ :
 Add a pluggable transport to be used with bridges
 * transportLine : string, built as described in the tor man page for the ClientTransportPlugin parameter in the torrc file
 ```
-transportName exec pathToBinary
+transportName exec pathToBinary arg1 arg2 ...
 ```
 or
 ```
@@ -344,7 +344,7 @@ __ths_pool.addTransport(transportLine, save)__ :
 Add a pluggable transport to be used with bridges
 * transportLine : string, built as described in the tor man page for the ClientTransportPlugin parameter in the torrc file
 ```
-transportName exec pathToBinary
+transportName exec pathToBinary arg1 arg2 ...
 ```
 or
 ```

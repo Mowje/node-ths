@@ -1,6 +1,6 @@
 {
   "name": "ths",
-  "version": "2.1.1",
+  "version": "2.1.2",
   "description": "A module that lets you start a Tor instance, use bridges and create Tor hidden services from node.js",
   "main": "index.js",
   "scripts": {

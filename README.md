@@ -236,6 +236,7 @@ __ths_pool(mainConfigFile, keysFolder, torInstancesFolder, [hsPerProcess], [spaw
 	* torMessageHandler : function that will receive Tor console messages (from `stdout`)
 	* torControlMessageHandler : function that will receive the control messages sent from the Tor process (through the control port)
 	* torCommand : the command/relative path to be called when spawning the Tor process. Used to override a global `tor` command
+	* socksPort : Number or array of numbers. Preferred SOCKS port(s) for the pool's instances
 
 __ths_pool.start([force], [callback])__ :
 

@@ -17,6 +17,23 @@ module.exports = function(globalConfigPath, keysFolder, torInstancesFolder, _hsP
 		if (torProcessOptionsObj.torMessageHandler && typeof torProcessOptionsObj.torMessageHandler != 'function') throw new TypeError('When defined, torMessageHandler must be a function');
 		if (torProcessOptionsObj.torControlMessageHandler && typeof torProcessOptionsObj.torControlMessageHandler != 'function') throw new TypeError('When defined, torControlMessageHandler must be a function');
 		if (torProcessOptionsObj.torCommand && typeof torProcessOptionsObj.torCommand != 'string') throw new TypeError('When defined, torCommand must be a string');
+		if (torProcessOptionsObj.socksPort && !(Array.isArray(torProcessOptionsObj.socksPort) || typeof torProcessOptionsObj.socksPort == 'number')) throw new TypeError('when defined, socksPort must either be a number or an array of numbers')
+	}
+
+	var socks = []; //Copy of the socks ports we want
+	var socksDistribution; //List of undistributed ports. Refilled at each start up from `socks`
+
+	if (torProcessOptionsObj.socksPort){
+		if (Array.isArray(torProcessOptionsObj.socksPort)){
+			for (var i = 0; i < torProcessOptionsObj.socksPort.length; i++){
+				var currentPort = torProcessOptionsObj.socksPort[i];
+				if (!(typeof currentPort == 'number' && currentPort == Math.floor(currentPort) && currentPort > 0 && currentPort < 65536)) throw new TypeError('socksPort must be integer numbers n, where 0 < n < 65536');
+				socks.push(currentPort);
+			}
+		} else {
+			if (!(torProcessOptionsObj.socksPort == Math.floor(torProcessOptionsObj.socksPort) && torProcessOptionsObj.socksPort > 0 && torProcessOptionsObj.socksPort < 65536)) throw new TypeError('socksPort must be an integer number n, where 0 < n < 65536');
+			socks[0] = torProcessOptionsObj.socksPort;
+		}
 	}
 
 	var checkServiceName = function(serviceName){
@@ -268,6 +285,12 @@ module.exports = function(globalConfigPath, keysFolder, torInstancesFolder, _hsP
 
 	this.start = function(force, bootstrapCallback){
 		if (bootstrapCallback && typeof bootstrapCallback != 'function') throw new TypeError('When defined, bootstrapCallback must be a function');
+
+		socksDistribution = [];
+		for (var i = 0; i < socks.length; i++){
+			socksDistribution.push(socks[i]);
+		}
+
 		saveConfig();
 		buildInstanceFolders(true, function(){
 			torProcesses = [];
@@ -280,11 +303,23 @@ module.exports = function(globalConfigPath, keysFolder, torInstancesFolder, _hsP
 			var torCommand = torProcessOptionsObj ? torProcessOptionsObj.torCommand : undefined;
 
 			function spawnOne(){
-				getRandomPort(function(err, socksPort){
-					if (err){
-						if (bootstrapCallback){ bootstrapCallback(err); return; }
-						else throw err;
-					}
+				var socksPort;
+				if (socksDistribution.length > 0){
+					socksPort = socksDistribution[0];
+					//socksDistribution.splice(0, 1);
+					drawControlAndSpawn();
+				} else {
+					getRandomPort(function(err, _socksPort){
+						if (err){
+							if (bootstrapCallback){ bootstrapCallback(err); return; }
+							else throw err;
+						}
+						socksPort = _socksPort;
+						drawControlAndSpawn();
+					});
+				}
+
+				function drawControlAndSpawn(){
 					getRandomPort(function(err, controlPort){
 						if (err){
 							if (bootstrapCallback){ bootstrapCallback(err); return; }
@@ -293,6 +328,12 @@ module.exports = function(globalConfigPath, keysFolder, torInstancesFolder, _hsP
 						if (socksPort == controlPort){
 							spawnOne();
 							return;
+						}
+
+						if (socksDistribution.length > 0){
+							//No need to redraw ports.
+							//So we remove from the list the last one we drew
+							socksDistribution.splice(0, 1);
 						}
 
 						var instanceFolder = path.join(torInstancesFolder, 'tor-' + (processCount + 1).toString());
@@ -308,7 +349,7 @@ module.exports = function(globalConfigPath, keysFolder, torInstancesFolder, _hsP
 							} else spawnOne();
 						});
 					});
-				});
+				}
 			}
 			spawnOne();
 		});
@@ -600,6 +641,11 @@ module.exports = function(globalConfigPath, keysFolder, torInstancesFolder, _hsP
 
 		var spawnCount = 0;
 
+		var torErrorHandler = torProcessOptionsObj ? torProcessOptionsObj.torErrorHandler : undefined;
+		var torMessageHandler = torProcessOptionsObj ? torProcessOptionsObj.torMessageHandler : undefined;
+		var torControlMessageHandler = torProcessOptionsObj ? torProcessOptionsObj.torControlMessageHandler : undefined;
+		var torCommand = torProcessOptionsObj ? torProcessOptionsObj.torCommand : undefined;
+
 		function spawnTor(){
 			spawnCount++;
 			if (spawnCount >= 10){
@@ -607,12 +653,25 @@ module.exports = function(globalConfigPath, keysFolder, torInstancesFolder, _hsP
 				console.error('Queue mode deactivated in ths-pool. Please investigate the errors');
 				return;
 			}
-			getRandomPort(function(err, socksPort){
-				if (err){
-					console.error('Error while getting a random port: ' + err);
-					spawnTor();
-					return;
-				}
+			var socksPort;
+
+			if (socksDistribution.length > 0){
+				socksPort = socksDistribution[0];
+				drawControlAndSpawn();
+			} else {
+				getRandomPort(function(err, _socksPort){
+					if (err){
+						console.error('Error while getting a random port: ' + err);
+						spawnTor();
+						return;
+					}
+					socksPort = _socksPort
+					drawControlAndSpawn();
+				});
+
+			}
+
+			function drawControlAndSpawn(){
 				getRandomPort(function(err, controlPort){
 					if (err){
 						console.error('Error while getting a random port: ' + err);
@@ -624,10 +683,9 @@ module.exports = function(globalConfigPath, keysFolder, torInstancesFolder, _hsP
 						return;
 					}
 
-					var torErrorHandler = torProcessOptionsObj ? torProcessOptionsObj.torErrorHandler : undefined;
-					var torMessageHandler = torProcessOptionsObj ? torProcessOptionsObj.torMessageHandler : undefined;
-					var torControlMessageHandler = torProcessOptionsObj ? torProcessOptionsObj.torControlMessageHandler : undefined;
-					var torCommand = torProcessOptionsObj ? torProcessOptionsObj.torCommand : undefined;
+					if (socksDistribution.length > 0){
+						socksDistribution.splice(0, 1);
+					}
 
 					var torInstance = new ths(newFolderName, socksPort, controlPort, torErrorHandler, torMessageHandler, torControlMessageHandler, keysFolder);
 					if (torCommand) torInstance.setTorCommand(torCommand);
@@ -635,7 +693,7 @@ module.exports = function(globalConfigPath, keysFolder, torInstancesFolder, _hsP
 						torProcesses.push(torInstance);
 					});
 				});
-			});
+			}
 		}
 		spawnTor();
 	}

@@ -10,7 +10,8 @@ var thsConfig = {
 	torMessageHandler: console.log,
 	torControlMessageHandler: function(msg){
 		console.log('Ctrl: ' + msg);
-	}
+	},
+	socksPort: [15000, 15001, 15002, 15003, 15004]
 };
 var ths = new thsBuilder('./ths-pool/main.conf', './ths-pool/keys/', './ths-pool/instances/', 2, 60000, thsConfig);
 

@@ -199,6 +199,9 @@ rl.on('line', function(line){
 				console.log(transportsList[i].name + ' ' + transportsList[i].type + ' ' + transportsList[i].parameter);
 			}
 			break;
+		case 'isoptimal':
+			console.log('Is the pool optimal: ' + ths.isOptimalPool());
+			break;
 		case 'pid':
 			if (ths.isTorRunning()){
 				console.log('Tor PID : ' + ths.torPid());
@@ -213,7 +216,7 @@ rl.on('line', function(line){
 				'list  -- List the configured hidden services\n' +
 				'status -- Get whether the tor process is running or not\n' +
 				'onion serviceName  -- Get the onion address if the service named "serviceName", if defined\n' +
-				'add serviceName traget1 port1 [target2 port2 ...]  -- Create a hidden service, referenced as "serviceName", with the given targets and ports\n' +
+				'add serviceName port1 traget1 [port2 target2...]  -- Create a hidden service, referenced as "serviceName", with the given targets and ports\n' +
 				'delete serviceName  -- Delete the service named "serviceName"\n' +
 				'rename oldServiceName newServiceName  -- Rename in the config the "oldServiceName" service into "newServiceName"\n' +
 				'addport serviceName port1 target1 [port2 target2 ...]  -- Add ports to service "serviceName"\n' +
@@ -225,6 +228,7 @@ rl.on('line', function(line){
 				'addtransport transportName type parameter  -- Add a pluggable transport to the Tor instance\n' +
 				'removetransport transportName  -- Remove a pluggable transport\n' +
 				'listtransports  -- List the added pluggable transports\n' +
+				'isoptimal  -- Returns whether the pool has an optimal repartition or not\n' +
 				'pid  -- Get the tor process PID\n' +
 				'exit  -- Exit this program');
 			break;

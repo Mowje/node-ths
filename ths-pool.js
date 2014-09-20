@@ -378,7 +378,11 @@ module.exports = function(globalConfigPath, keysFolder, torInstancesFolder, _hsP
 
 	this.isTorRunning = function(){
 		return processesRunning;
-	}
+	};
+
+	this.isOptimalPool = function(){
+		return (!(torProcesses.length > Math.ceil(globalServiceList.length / hsPerProcess)));
+	};
 
 	this.torPid = function(){
 		if (!processesRunning) return;

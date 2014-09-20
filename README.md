@@ -255,6 +255,10 @@ __ths_pool.isTorRunning()__ :
 
 Returns a boolean indicating whether the process pool is running or not
 
+__ths_pool.isOptimalPool()__ :
+
+Returns whether the pool is optimal. If it isn't, restarting the pool will make it optimal again (Hidden Services will be re-splitted across a lower number of processes)
+
 __ths_pool.createHiddenService(serviceName, ports, [saveNow])__ :
 
 Creates a new tor hidden service :

@@ -204,7 +204,7 @@ rl.on('line', function(line){
 				'list  -- List the configured hidden services\n' +
 				'status -- Get whether the tor process is running or not\n' +
 				'onion serviceName  -- Get the onion address if the service named "serviceName", if defined\n' +
-				'add serviceName traget1 port1 [target2 port2 ...]  -- Create a hidden service, referenced as "serviceName", with the given targets and ports\n' +
+				'add serviceName port1 traget1 [port2 target2...]  -- Create a hidden service, referenced as "serviceName", with the given targets and ports\n' +
 				'delete serviceName  -- Delete the service named "serviceName"\n' +
 				'rename oldServiceName newServiceName  -- Rename in the config the "oldServiceName" service into "newServiceName"\n' +
 				'addport serviceName port1 target1 [port2 target2 ...]  -- Add ports to service "serviceName"\n' +

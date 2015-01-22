@@ -379,7 +379,7 @@ module.exports = function(thsFolder, socksPortNumber, controlPortNumber, torErro
 						if (typeof bootstrapCallback == 'function') bootstrapCallback();
 					}
 				});
-			});
+			}, torCommand);
 		}
 	};
 

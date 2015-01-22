@@ -1,6 +1,6 @@
 var spawn = require('child_process').spawn;
 
-module.exports = function(length, callback){
+module.exports = function(length, callback, cmd){
 	if (!(typeof length == 'number' && length > 0)) throw new TypeError('length must be a strictly positive number');
 	if (!(typeof callback == 'function')) throw new TypeError('callback must be a function');
 
@@ -18,7 +18,7 @@ module.exports = function(length, callback){
 
 	function getPasswordHash(pass, callback){
 		var output = '';
-		var torProcess = spawn('tor', ['--hash-password', pass]);
+		var torProcess = spawn(cmd || 'tor', ['--hash-password', pass]);
 		torProcess.stdout.on('data', function(data){
 			output += data;
 		});

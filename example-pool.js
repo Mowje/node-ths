@@ -66,6 +66,20 @@ rl.on('line', function(line){
 				console.log('Invalid command. Syntax : onion service-name');
 			}
 			break;
+		case 'async-onion':
+			if (line.length > 1){
+				var serviceName = line[1];
+				ths.getOnionAddress(serviceName, function(err, hostname){
+					if (err){
+						console.error('Error while reading hostname file: ' + err);
+					} else {
+						console.log('Onion name for ' + serviceName + ' : ' + hostname);
+					}
+				});
+			} else {
+				console.log('Invalid command. Syntax : async-onion service-name');
+			}
+			break;
 		case 'add':
 			//syntax : add service-name onePort target1 [port2 target2,...]
 			if (line.length > 3){

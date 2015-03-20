@@ -56,6 +56,7 @@ module.exports = function(globalConfigPath, keysFolder, torInstancesFolder, _hsP
 
 	var queueInterval;
 	var addQueue = [];
+	var onionWatchers = {};
 
 	if (fs.existsSync(globalConfigPath)){
 		if (fs.statSync(globalConfigPath).isFile()){ if (!loadConfig()) console.log('Error while loading existing config'); }
@@ -122,6 +123,25 @@ module.exports = function(globalConfigPath, keysFolder, torInstancesFolder, _hsP
 	}
 
 	this.saveConfig = saveConfig;
+
+	function watchOnion(serviceName, cb){
+		var onionPath = path.join(keysFolder, serviceName, 'hostname');
+		onionWatchers[serviceName] = setInterval(onionHandler, 50);
+
+		function onionHandler(){
+			fs.exists(onionPath, function(onionExists){
+				if (onionExists){
+					clearInterval(onionWatchers[serviceName]);
+					onionWatchers[serviceName] = null;
+
+					fs.readFile(onionPath, {encoding: 'utf8'}, function(err, hData){
+						if (err) cb(err);
+						else cb(undefined, hData.replace('\n', '').replace('\r', '')); //Trimming any line feeds and carriage returns
+					});
+				}
+			});
+		}
+	}
 
 	this.createHiddenService = function(serviceName, ports, applyNow){
 		if (!(ports && serviceName)) throw new TypeError('Missing parameters');
@@ -246,10 +266,17 @@ module.exports = function(globalConfigPath, keysFolder, torInstancesFolder, _hsP
 		return found;
 	};
 
-	this.getOnionAddress = function(serviceName){
+	this.getOnionAddress = function(serviceName, cb){
 		if (!(typeof serviceName == 'string' && checkServiceName(serviceName))) throw new TypeError('invalid service name');
+		if (cb && typeof cb != 'function') throw new TypeError('when defined, cb must be a function');
 		for (var i = 0; i < globalServiceList.length; i++){
 			if (globalServiceList[i].name == serviceName){
+
+				if (cb){
+					watchOnion(serviceName, cb);
+					return;
+				}
+
 				var fileReadCount = 0;
 				while (fileReadCount < 3){
 					try {
@@ -262,8 +289,11 @@ module.exports = function(globalConfigPath, keysFolder, torInstancesFolder, _hsP
 				break;
 			}
 		}
-		if (torProcesses && torProcesses.length > 0) throw new TypeError('Service name ' + serviceName + ' not found in config');
-		else return undefined;
+		if (torProcesses && torProcesses.length > 0){
+			var e = new TypeError('Service name ' + serviceName + ' not found in config');
+			if (cb) cb(e);
+			else throw e;
+		} else return undefined;
 	};
 
 	this.getServices = function(){

@@ -33,6 +33,7 @@ module.exports = function(thsFolder, socksPortNumber, controlPortNumber, torErro
 	var services = [];
 	var bridges = [];
 	var transports = [];
+	var onionWatchers = {};
 
 	/*
 	* Initializing file paths
@@ -87,6 +88,25 @@ module.exports = function(thsFolder, socksPortNumber, controlPortNumber, torErro
 		if (!(fs.existsSync(folderPath) && fs.statSync(folderPath).isDirectory())){
 			if (!fs.existsSync(path.join(folderPath, '..'))) buildPath(path.join(folderPath, '..'));
 			else fs.mkdirSync(folderPath);
+		}
+	}
+
+	function watchOnion(serviceName, cb){
+		var onionPath = path.join(hiddenServicePath, serviceName, 'hostname');
+		onionWatchers[serviceName] = setInterval(onionHandler, 50);
+
+		function onionHandler(){
+			fs.exists(onionPath, function(onionExists){
+				if (onionExists){
+					clearInterval(onionWatchers[serviceName]);
+					onionWatchers[serviceName] = null;
+
+					fs.readFile(onionPath, {encoding: 'utf8'}, function(err, hData){
+						if (err) cb(err);
+						else cb(undefined, hData.replace('\n', '').replace('\r', '')); //Trimming any line feeds and carriage returns
+					});
+				}
+			});
 		}
 	}
 
@@ -295,13 +315,22 @@ module.exports = function(thsFolder, socksPortNumber, controlPortNumber, torErro
 		throw new TypeError('Service name not found in config');
 	};
 
-	this.getOnionAddress = function(serviceName){
+	this.getOnionAddress = function(serviceName, cb){
+		if (!(typeof serviceName == 'string' && checkServiceName(serviceName))) throw new TypeError('Invalid service name');
+		if (cb && typeof cb != 'function') throw new TypeError('When provided, cb must be a function');
+
 		for (var i = 0; i < services.length; i++){
 			if (services[i].name == serviceName) {
+
+				if (cb) {
+					watchOnion(serviceName, cb);
+					return;
+				}
+
 				var fileReadCount = 0;
 				while (fileReadCount < 3){ //Why did I write this? Answer : Trying 3 times in vain in case the files are not here yet...
 					try {
-						return fs.readFileSync(path.join(hiddenServicePath, serviceName, 'hostname')).toString('utf8').replace('\n', '');
+						return fs.readFileSync(path.join(hiddenServicePath, serviceName, 'hostname')).toString('utf8').replace('\n', '').replace('\r', '');
 					} catch (e){
 						if (fileReadCount < 3) fileReadCount++;
 						else throw e;
@@ -310,8 +339,11 @@ module.exports = function(thsFolder, socksPortNumber, controlPortNumber, torErro
 				break;
 			}
 		}
-		if (torProcess) throw new TypeError('Service name ' + serviceName + ' not found in config');
-		else return undefined;
+		if (torProcess){
+			var e = new TypeError('Service name ' + serviceName + ' not found in config');
+			if (cb) cb(e);
+			else throw e;
+		} else return undefined;
 	};
 
 	this.getServices = function(){

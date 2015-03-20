@@ -39,7 +39,7 @@ module.exports = function(thsFolder, socksPortNumber, controlPortNumber, torErro
 	*/
 
 	//Path to folder that will contain the config file and hidden services' keys
-	var baseFolder = thsFolder ? path.join(process.cwd(), thsFolder) : process.cwd();
+	var baseFolder = thsFolder ? thsFolder : process.cwd();
 	//if (baseFolder && !(baseFolder.lastIndexOf(fseperator) == baseFolder.length - 1)) baseFolder += fseperator; //Adding the path seperator if necessary
 	baseFolder = path.join(baseFolder, 'ths-data');
 	if (!fs.existsSync(baseFolder)) buildPath(baseFolder); //Creating the folder if it doesn't exist

@@ -116,11 +116,12 @@ __ths.getServices()__ :
 
 Returns the service list
 
-__ths.getOnionAddress(serviceName)__ :
+__ths.getOnionAddress(serviceNamec, [callback])__ :
 
 Returns the .onion hostname for the given service
 
 * serviceName : name of the service you are looking for
+* callback : optional callback. Receives (err, hostname). If used, the callback is only invoked once the onion address exists. (ie, it retries until it succeeds)
 
 __ths.torPid()__ :
 
@@ -303,11 +304,12 @@ __ths_pool.getServices()__ :
 
 Get the list of running services, with their `name` and array of `ports`
 
-__ths_pool.getOnionAddress(serviceName)__ :
+__ths_pool.getOnionAddress(serviceName, [callback])__ :
 
 Get the onion address of an existing hidden service, given it's serviceName. Note that this method might return `undefined` even though the hidden service exists (but hasn't been "started" for the first time yet)
 
 * serviceName : name of the service you're looking for
+* callback : optional callback. Receives (err, hostname). If used, the callback is only invoked once the onion address exists. (ie, it retries until it succeeds)
 
 __ths_pool.torPid()__ :
 

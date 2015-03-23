@@ -190,6 +190,8 @@ module.exports = function(thsFolder, socksPortNumber, controlPortNumber, torErro
 		}
 	}
 
+	this.signalReload = signalReload;
+
 	/*
 	* Hidden services manageement
 	*/
@@ -224,11 +226,11 @@ module.exports = function(thsFolder, socksPortNumber, controlPortNumber, torErro
 		for (var i = 0; i < services.length; i++){
 			if (services[i].name == serviceName) {
 				services.splice(i, 1);
-				var containedFiles = fs.readdirSync(hiddenServicePath + serviceName);
+				var containedFiles = fs.readdirSync(path.join(hiddenServicePath, serviceName));
 				for (var j = 0; j < containedFiles.length; j++){
 					fs.unlinkSync(path.join(hiddenServicePath, serviceName, containedFiles[j]));
 				}
-				fs.rmdirSync(hiddenServicePath + serviceName);
+				fs.rmdirSync(path.join(hiddenServicePath, serviceName));
 				found = true;
 				break;
 			}

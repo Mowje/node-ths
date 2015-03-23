@@ -71,6 +71,30 @@ rl.on('line', function(line){
 				console.log('Invalid command. Syntax : async-onion service-name');
 			}
 			break;
+		case 'async-add-onion':
+			if (line.length > 3){
+				var serviceName = line[1];
+				var ports = [];
+				var actualPort;
+				for (var i = 1; i < (line.length - 1) / 2; i++){
+					actualPort = line[2*i] + ' ' + line[2*i + 1];
+					ports.push(actualPort);
+				}
+
+				ths.createHiddenService(serviceName, ports);
+				ths.saveConfig();
+				ths.getOnionAddress(serviceName, function(err, hostname){
+					if (err){
+						console.error('Error while reading hostname file: ' + err);
+					} else {
+						console.log('Onion name for ' + serviceName + ' : ' + hostname);
+					}
+				});
+				ths.signalReload();
+			} else {
+				console.log('Invalid comamnd. Syntax: async-add-onion service-name onePort target1 [otherPort otherTarget, ...]');
+			}
+			break;
 		case 'add':
 			//syntax : add service-name onePort target1 [port2 target2,...]
 			if (line.length > 3){

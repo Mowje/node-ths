@@ -153,6 +153,10 @@ __ths.saveConfig()__ :
 
 Saves the config. Must be called when changes are made to the config (service addition/deletion, ports addition/deletion)
 
+__ths.signalReload()__ :
+
+Sends a signal to the tor process to close all open circuits and clear its internal state. __NOTE:__ it will result in downtime for any hidden service hosted by the process (while it rebuilds new circuits and republishes service descriptors)
+
 __ths.addBridge(bridgeLine, save)__ :
 
 Add a bridge to be used as a client. Returns true if the bridgeLine is correctly formated, false otherwise

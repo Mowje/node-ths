@@ -3,10 +3,16 @@ var fs = require('fs');
 var os = require('os');
 var net = require('net');
 var path = require('path');
+var util = require('util');
+var events = require('events');
 var passhash = require('./passhash');
 
-module.exports = function(thsFolder, socksPortNumber, controlPortNumber, torErrorHandler, torMessageHandler, torControlMessageHandler, keysFolder){
+module.exports = Ths;
 
+function Ths(thsFolder, socksPortNumber, controlPortNumber, torErrorHandler, torMessageHandler, torControlMessageHandler, keysFolder){
+	events.EventEmitter.call(this);
+
+	var self = this;
 	//var fseperator = (os.platform().indexOf('win') == 0) ? '\\' : '/'; //Selects the right path seperator corresponding to the OS platform
 	var fseperator = path.sep;
 	var torCommand = 'tor';
@@ -18,6 +24,12 @@ module.exports = function(thsFolder, socksPortNumber, controlPortNumber, torErro
 	var checkServiceName = function(serviceName){
 		var regexCheck = /^[a-zA-Z0-9-_]+$/;
 		return regexCheck.test(serviceName);
+	};
+
+	var extractBootstrap = function(line){
+		var bootstrapState = /Bootstrapped (\d{1,3})%/gm.exec(line);
+		if (bootstrapState && bootstrapState[1]) return bootstrapState[1];
+		else return undefined;
 	};
 
 	if (socksPortNumber && typeof socksPortNumber != 'number') throw new TypeError('When defined, socksPortNumber must be a number');
@@ -305,7 +317,7 @@ module.exports = function(thsFolder, socksPortNumber, controlPortNumber, torErro
 					}
 				}
 				if (deleteIfEmptied && services[i].ports.length == 0){
-					this.removeHiddenService(serviceName, applyNow);
+					self.removeHiddenService(serviceName, applyNow);
 				}
 				if (applyNow){
 					saveConfig();
@@ -361,18 +373,20 @@ module.exports = function(thsFolder, socksPortNumber, controlPortNumber, torErro
 			servicesCopy.push(serviceObjCopy);
 		}
 		for (var i = 0; i < servicesCopy.length; i++){
-			servicesCopy[i].hostname = this.getOnionAddress(servicesCopy[i].name);
+			servicesCopy[i].hostname = self.getOnionAddress(servicesCopy[i].name);
 		}
 		return servicesCopy;
 	};
 
 	this.start = function(force, bootstrapCallback){
+		if (typeof bootstrapCallback == 'function') self.once('bootstrapped', bootstrapCallback);
+
 		//if (!services || services.length == 0) throw new TypeError('Please load the config before calling the start() method');
 		if (torProcess) {
 			if (force) {
 				//Kills the process and waits it to shutdown, then recalls start a second time, with force == false and passes the callback given at the first call
-				this.stop(function(){
-					this.start(false, bootstrapCallback);
+				self.stop(function(){
+					self.start(false, bootstrapCallback);
 				});
 			} else {
 				throw new TypeError('A Tor instance is already running. Please stop before starting a new one.');
@@ -392,14 +406,26 @@ module.exports = function(thsFolder, socksPortNumber, controlPortNumber, torErro
 					});
 				}
 
+				torProcess.stdout.setEncoding('utf8');
 				torProcess.stdout.on('data', function(data){
-					if (data.toString().indexOf('[warn]') > -1 || data.toString().indexOf('[err]') > -1){
-						if (torErrorHandler) torErrorHandler(data.toString('utf8'));
+					if (data.indexOf('[warn]') > -1 || data.indexOf('[err]') > -1){
+						if (torErrorHandler) torErrorHandler(data);
 						//console.log('Error with the tor process : ' + data.toString('utf8'));
 					} else {
-						if (torMessageHandler) torMessageHandler(data.toString('utf8'));
+						if (torMessageHandler) torMessageHandler(data);
 					}
-					if (data.toString('utf8').indexOf('Bootstrapped 100%') > -1) {
+
+					var bootstrapState = extractBootstrap(data);
+					if (bootstrapState){
+						bootstrapState = Number(bootstrapState);
+						if (isNaN(bootstrapState)){
+							console.error('Bootstrap state cannot be casted into a number');
+						} else {
+							self.emit('bootstrap', bootstrapState);
+						}
+					}
+
+					if (data.indexOf('Bootstrapped 100%') > -1) {
 						controlClient = net.connect({host: '127.0.0.1', port: Number(controlPort)}, function(){
 							controlClient.write('AUTHENTICATE "' + controlPass + '"\r\n');
 							//console.log("Tor process PID : " + torProcess.pid);
@@ -410,7 +436,7 @@ module.exports = function(thsFolder, socksPortNumber, controlPortNumber, torErro
 							//if (showTorControlMessages) console.log('Message from ControlPort: ' + data);
 							//console.log('Message from ControlPort: ' + data.toString());
 						});
-						if (typeof bootstrapCallback == 'function') bootstrapCallback();
+						self.emit('bootstrapped');
 					}
 				});
 			}, torCommand);
@@ -421,10 +447,11 @@ module.exports = function(thsFolder, socksPortNumber, controlPortNumber, torErro
 		if (!torProcess) {
 			return;
 		}
+		torProcess.on('close', function(){
+			self.emit('stop');
+		});
 		if (callback && typeof callback == 'function') {
-			torProcess.on('close', function(){
-				callback();
-			});
+			self.once('stop', callback);
 		}
 		if (controlClient){
 			controlClient.end();
@@ -653,4 +680,6 @@ module.exports = function(thsFolder, socksPortNumber, controlPortNumber, torErro
 		return transportConfigObj.name + ' ' + transportConfigObj.type + ' ' + transportConfigObj.parameter + (transportConfigObj.args.length > 0 ? ' ' + transportConfigObj.args.join(' ') : '');
 	}
 
-};
+}
+
+util.inherits(Ths, events.EventEmitter);

@@ -7,6 +7,10 @@ var http = require('http');
 var thsBuilder = require('./index');
 var ths = new thsBuilder(undefined, undefined, undefined, console.error, console.log, function(controlMessage){console.log('Ctrl: ' + controlMessage)});
 
+ths.on('bootstrap', function(percentage){
+	console.log('Process bootstrap percentage: ' + percentage);
+});
+
 var server = http.createServer(function (req, res){
 	res.writeHead(200, {'Content-Type': 'text/plain'});
 	res.end('Hello world!');

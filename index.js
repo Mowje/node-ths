@@ -409,6 +409,12 @@ function Ths(thsFolder, socksPortNumber, controlPortNumber, torErrorHandler, tor
 				torProcess.stdout.setEncoding('utf8');
 				torProcess.stdout.on('data', function(data){
 					if (data.indexOf('[warn]') > -1 || data.indexOf('[err]') > -1){
+						if (data.indexOf('Could not bind to') > -1){
+							//Port binding error. Emit corresponding event
+							var addressBindingError = /Could not bind to (\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d{1,5})/g.exec(data);
+							var unbindableAddress = addressBindingError && addressBindingError[1];
+							if (unbindableAddress) self.emit('bindingError', unbindableAddress);
+						}
 						if (torErrorHandler) torErrorHandler(data);
 						//console.log('Error with the tor process : ' + data.toString('utf8'));
 					} else {

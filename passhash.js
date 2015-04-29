@@ -23,7 +23,7 @@ module.exports = function(length, callback, cmd){
 			output += data;
 		});
 		torProcess.on('close', function(){
-			var hash = output.match(/(^16:[0-9A-F]{58})/)[0];
+			var hash = output.match(/(^16:[0-9A-F]{58})/m)[0];
 			callback(pass, hash);
 		});
 	}

@@ -25,7 +25,7 @@ module.exports = function(length, callback, cmd){
 		torProcess.on('close', function(){
 			output = output.split('\n');
 			var hash;
-			for (var i = output.length - 1; i > 0; i--){
+			for (var i = output.length - 1; i >= 0; i--){
 				if (output[i] && output[i] != ""){
 					hash = output[i];
 					break;
